@@ -1,0 +1,78 @@
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id       String  @id @default(uuid())
+  name     String
+  email    String  @unique
+  password String
+  role     UserRole @default(CUSTOMER)
+
+  products      Product[]
+  transactions  Transaction[]
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  origin      String        
+  roastLevel  RoastLevel    
+  process     String        
+  flavorNotes String        
+  price       Int
+  stock       Int
+  imageUrl    String?       
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       TransactionItem[]
+}
+
+enum RoastLevel {
+  LIGHT
+  MEDIUM
+  DARK
+}
+model TransactionItem {
+  id            String     @id @default(uuid())
+  quantity      Int
+  product       Product    @relation(fields: [productId], references: [id])
+  productId     String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  transactionId String
+}
+
+model Transaction {
+  id        String           @id @default(uuid())
+  total     Int
+  status    TransactionStatus @default(PENDING)
+  items     TransactionItem[]
+  createdAt DateTime         @default(now())
+  createdBy User             @relation(fields: [createdById], references: [id])
+  createdById String
+}
+
+enum TransactionStatus{
+  PAID
+  PENDING
+  CANCELLED
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
+model BlacklistedToken {
+  id        String    @id   @default(uuid())
+  token     String    @unique
+  createdAt DateTime  @default(now())
+}
