@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -9,12 +9,11 @@ import { User } from '@prisma/client';
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService) {}
-
   async register(data: RegisterDto): Promise<UserResponseDto> {
-    const exist: User | null = await this.prisma.user.findUnique({
+    const exist: User | null = await this.prisma?.user?.findUnique({
       where: { email: data.email },
     });
-
+    
     if (exist) {
       throw new Error('Email already exists');
     }
@@ -57,13 +56,21 @@ export class AuthService {
     return { token, user: safe };
   }
 
-  async logout(token?: string): Promise<boolean> {
-    if (!token) return false;
+  async logout(authHeader?: string) {
+    const token = authHeader?.split(' ')[1];
+    if (!token) throw new BadRequestException('No token provided');
 
     await this.prisma.blacklistedToken.create({
       data: { token },
     });
-
-    return true;
+    return { message: 'Successfully logged out' };
   }
+
+  async isBlacklisted(token: string): Promise<boolean> {
+    const blacklisted = await this.prisma.blacklistedToken.findUnique({
+      where: { token },
+    });
+    return !!blacklisted;
+  }
+
 }

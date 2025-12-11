@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { UserResponseDto } from 'src/types/auth';
@@ -7,7 +7,7 @@ import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   @Post('register')
   @ApiBody({ type: RegisterDto })
@@ -35,5 +35,14 @@ export class AuthController {
     @Body() body: { email: string; password: string },
   ): Promise<{ token: string; user: UserResponseDto }> {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Post('logout')
+  @ApiResponse({ status: 200, schema: { example: { message: 'Successfully logged out' } } })
+  async logout(@Req() req): Promise<{ message: string }> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) throw new BadRequestException('Authorization header is missing');
+
+    return this.authService.logout(authHeader);
   }
 }
