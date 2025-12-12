@@ -130,19 +130,20 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should return false if no token', async () => {
-      const result = await service.logout();
-      expect(result).toBe(false);
+    it('should throw if no token provided', async () => {
+      await expect(service.logout()).rejects.toThrow('No token provided');
     });
 
-    it('should return true if token provided', async () => {
+    it('should logout successfully if token provided', async () => {
       mockPrisma.blacklistedToken.create.mockResolvedValue({ token: 'abc' });
 
-      const result = await service.logout('abc');
-      expect(result).toBe(true);
+      const result = await service.logout('Bearer abc');
+
+      expect(result).toEqual({ message: 'Successfully logged out' });
       expect(mockPrisma.blacklistedToken.create).toHaveBeenCalledWith({
         data: { token: 'abc' },
       });
     });
   });
+
 });
