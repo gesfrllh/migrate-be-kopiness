@@ -41,15 +41,15 @@ export class ProductController {
   findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
   }
-
-  @UseGuards(JwtGuard)
+  
   @Patch(':id')
+  @UseGuards(JwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.productService.update(id, dto);
   }
 
-  @UseGuards(JwtGuard)
   @Delete(':id')
+  @UseGuards(JwtGuard) 
   remove(@Param('id') id: string) {
     return this.productService.remove(id);
   }
