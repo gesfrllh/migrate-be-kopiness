@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Req } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
+import { AuthRequest } from 'src/auth/interfaces/auth-request.interface';
 
 @Injectable()
 export class ProductService {
@@ -16,8 +17,26 @@ export class ProductService {
     });
   }
 
-  async findAll() {
-    return this.prisma.product.findMany({
+  async findAllByUser(userId: string) {
+   const products = await this.prisma.product.findMany({
+      where: {
+        createdById: userId
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    })
+    return products
+  }
+
+  async findOne(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
       include: {
         createdBy: {
           select: {
@@ -25,20 +44,6 @@ export class ProductService {
             name: true,
           }
         }
-      },
-    });
-  }
-
-  async findOne(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
-      include: { 
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-          }
-        } 
       },
     });
 
