@@ -48,7 +48,7 @@ export class AuthService {
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.JWT_SECRET_KEY || 'secret',
+      process.env.JWT_SECRET || 'SECRET',
     );
 
     const { password: _, ...safe } = user;
@@ -74,3 +74,4 @@ export class AuthService {
   }
 
 }
+  

@@ -5,6 +5,9 @@ import { UpdateProductDto } from './dto/updateProduct.dto';
 import { JwtGuard } from 'src/common/guards/jwt.guard';
 import { ApiBody, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { ProductResponseDto } from './dto/product.dto';
+import { CurrentUser } from 'src/auth/decorators/current-user.decarotar';
+import type { JwtPayload } from 'jsonwebtoken';
+import { successResponse } from 'src/common/utils/api-response';
 
 @Controller('products')
 export class ProductController {
@@ -32,8 +35,12 @@ export class ProductController {
     type: ProductResponseDto,
     isArray: true
   })
-  findAll() {
-    return this.productService.findAll();
+  async findAll(@CurrentUser() user: JwtPayload) {
+    const products = await this.productService.findAllByUser(user.id);
+    if(products.length === 0) {
+      return successResponse([], 'No Products Founds')
+    }
+    return successResponse(products, 'Products Fetched Successfuly')
   }
 
   @Get(':id')
