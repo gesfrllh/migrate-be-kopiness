@@ -24,7 +24,7 @@ async function bootstrap() {
   app.enableCors();
 
   const port = process.env.PORT || 8000;
-  await app.listen(port, '0.0.0.0'); // bind ke IPv4 supaya localhost bisa diakses
+  await app.listen(port, '0.0.0.0'); 
 
   console.log(`Application is running on: http://localhost:${port}/api`);
 }
