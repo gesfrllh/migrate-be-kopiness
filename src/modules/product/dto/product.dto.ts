@@ -1,46 +1,51 @@
-// dto/product-response.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { RoastLevel } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger'
+import { RoastLevel } from '@prisma/client'
 
 class CreatedByDto {
-  @ApiProperty()
-  id: string;
+  @ApiProperty({ example: 'string' })
+  id: string
 
-  @ApiProperty()
-  name: string;
+  @ApiProperty({ example: 'string' })
+  name: string
 }
 
 export class ProductResponseDto {
-  @ApiProperty()
-  id: string;
+  @ApiProperty({ example: 'string' })
+  id: string
 
-  @ApiProperty()
-  name: string;
+  @ApiProperty({ example: 'string' })
+  name: string
 
-  @ApiProperty()
-  description: string;
+  @ApiProperty({ example: 'string' })
+  description: string
 
-  @ApiProperty()
-  origin: string;
+  @ApiProperty({ example: 'string' })
+  origin: string
 
   @ApiProperty({ enum: RoastLevel })
-  roastLevel: RoastLevel;
+  roastLevel: RoastLevel
 
-  @ApiProperty()
-  process: string;
+  @ApiProperty({ example: 'string' })
+  process: string
 
-  @ApiProperty()
-  flavorNotes: string;
+  @ApiProperty({ example: 'string' })
+  flavorNotes: string
 
-  @ApiProperty()
-  price: number;
+  @ApiProperty({ example: 85000 })
+  price: number
 
-  @ApiProperty()
-  stock: number;
+  @ApiProperty({ example: 100 })
+  stock: number
 
-  @ApiProperty({ required: false })
-  imageUrl?: string;
+  @ApiProperty({
+    example: [
+      'https://example.com/image1.jpg',
+      'https://example.com/image2.jpg',
+    ],
+    type: [String],
+  })
+  imageUrls: string[]
 
   @ApiProperty({ type: CreatedByDto })
-  createdBy: CreatedByDto;
+  createdBy: CreatedByDto
 }

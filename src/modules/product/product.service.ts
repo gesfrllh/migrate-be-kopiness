@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, Req } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
-import { AuthRequest } from 'src/auth/interfaces/auth-request.interface';
 
 @Injectable()
 export class ProductService {
