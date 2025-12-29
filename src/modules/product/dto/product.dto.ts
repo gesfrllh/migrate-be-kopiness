@@ -44,7 +44,7 @@ export class ProductResponseDto {
     ],
     type: [String],
   })
-  imageUrls: string[]
+  imageUrl: string[]
 
   @ApiProperty({ type: CreatedByDto })
   createdBy: CreatedByDto
