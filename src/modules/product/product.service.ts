@@ -15,22 +15,48 @@ export class ProductService {
       },
     });
   }
+  async findAllByUser(
+    userId: string,
+    page = 1,
+    limit = 10,
+    search?: string,
+  ) {
+    const skip = (page - 1) * limit;
 
-  async findAllByUser(userId: string) {
-   const products = await this.prisma.product.findMany({
-      where: {
-        createdById: userId
+    const where: any = {
+      createdById: userId,
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [products, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          createdBy: {
+            select: { id: true, name: true },
+          },
+        },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      data: products,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    })
-    return products
+    };
   }
 
   async findOne(id: string) {

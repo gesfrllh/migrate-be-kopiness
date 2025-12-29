@@ -1,9 +1,6 @@
-// src/product/product.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
-import { PrismaModule } from 'src/prisma/prisma.module';
-import { AuthModule } from 'src/auth/auth.module';
 
 describe('ProductController', () => {
   let controller: ProductController;
@@ -11,7 +8,7 @@ describe('ProductController', () => {
 
   const mockProductService = {
     create: jest.fn(),
-    findAll: jest.fn(),
+    findAllByUser: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -26,14 +23,14 @@ describe('ProductController', () => {
           useValue: mockProductService,
         },
       ],
-      imports: [
-        PrismaModule,
-        AuthModule
-      ]
     }).compile();
- 
+
     controller = module.get<ProductController>(ProductController);
     service = module.get<ProductService>(ProductService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -52,15 +49,35 @@ describe('ProductController', () => {
       stock: 12,
     };
 
-    const req = { user: { id: 'user-1' } };
+    const user = { id: 'user-1' };
 
-    await controller.create(dto as any, req as any);
+    await controller.create(dto as any, user as any);
+
     expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
   });
 
-  it('should call service.findAll', async () => {
-    await controller.findAll();
-    expect(service.findAll).toHaveBeenCalled();
+  it('should call service.findAllByUser with pagination', async () => {
+    mockProductService.findAllByUser.mockResolvedValue({
+      data: [],
+      meta: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      },
+    });
+
+    const user = { id: 'user-1' };
+    const query = { page: 1, limit: 10, search: '' };
+
+    await controller.findAll(user as any, query as any);
+
+    expect(service.findAllByUser).toHaveBeenCalledWith(
+      'user-1',
+      1,
+      10,
+      '',
+    );
   });
 
   it('should call service.findOne', async () => {
@@ -70,7 +87,7 @@ describe('ProductController', () => {
 
   it('should call service.update', async () => {
     const dto = { name: 'Updated' };
-    await controller.update('abc', dto);
+    await controller.update('abc', dto as any);
     expect(service.update).toHaveBeenCalledWith('abc', dto);
   });
 

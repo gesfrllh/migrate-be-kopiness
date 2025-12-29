@@ -1,13 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards, Query } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/createProduct.dto';
-import { UpdateProductDto } from './dto/updateProduct.dto'; 
+import { UpdateProductDto } from './dto/updateProduct.dto';
 import { JwtGuard } from 'src/common/guards/jwt.guard';
 import { ApiBody, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { ProductResponseDto } from './dto/product.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decarotar';
 import type { JwtPayload } from 'jsonwebtoken';
 import { successResponse } from 'src/common/utils/api-response';
+import { ProductListResponseDto } from './dto/productListRespons.dto';
+import { PaginationQueryDto } from './dto/paginationQueryDto';
 
 @Controller('products')
 export class ProductController {
@@ -32,23 +34,39 @@ export class ProductController {
   @UseGuards(JwtGuard)
   @ApiOkResponse({
     description: 'List All Product',
-    type: ProductResponseDto,
-    isArray: true
+    type: ProductListResponseDto,
   })
-  async findAll(@CurrentUser() user: JwtPayload) {
-    const products = await this.productService.findAllByUser(user.id);
-    if(products.length === 0) {
-      return successResponse([], 'No Products Founds')
+  async findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: PaginationQueryDto,
+  ) {
+    const result = await this.productService.findAllByUser(
+      user.id,
+      Number(query.page) || 1,
+      Number(query.limit) || 10,
+      query.search,
+    );
+
+    if (result.data.length === 0) {
+      return successResponse(
+        { data: [], meta: result.meta },
+        'No Products Found',
+      );
     }
-    return successResponse(products, 'Products Fetched Successfuly')
+
+    return successResponse(
+      result,
+      'Products Fetched Successfully',
+    );
   }
+
 
   @Get(':id')
   @UseGuards(JwtGuard)
   findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
   }
-  
+
   @Patch(':id')
   @UseGuards(JwtGuard)
   update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
@@ -56,7 +74,7 @@ export class ProductController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtGuard) 
+  @UseGuards(JwtGuard)
   remove(@Param('id') id: string) {
     return this.productService.remove(id);
   }

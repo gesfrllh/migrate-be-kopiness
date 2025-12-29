@@ -28,7 +28,7 @@ model Product {
   flavorNotes String        
   price       Int
   stock       Int
-  imageUrl    String?       
+  imageUrl    String[]       
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdById String
   createdAt   DateTime @default(now())
