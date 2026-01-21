@@ -4,6 +4,7 @@ dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +21,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  app.useGlobalInterceptors(
+    new ResponseInterceptor()
+  )
+  
   // Enable CORS
   app.enableCors({
     origin: 'http://localhost:3000',
@@ -32,7 +37,7 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 8000;
-  await app.listen(port, '0.0.0.0'); 
+  await app.listen(port, '0.0.0.0');
 
   console.log(`Application is running on: http://localhost:${port}/api`);
 }
