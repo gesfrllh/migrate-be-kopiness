@@ -47,17 +47,10 @@ export class ProductController {
       query.search,
     );
 
-    if (result.data.length === 0) {
-      return successResponse(
-        { data: [], meta: result.meta },
-        'No Products Found',
-      );
+    return {
+      data: result.data,
+      meta: result.meta
     }
-
-    return successResponse(
-      result,
-      'Products Fetched Successfully',
-    );
   }
 
 
