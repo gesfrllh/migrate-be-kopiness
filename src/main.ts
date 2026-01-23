@@ -5,9 +5,20 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import express from 'express';
+import { ExpressAdapter } from '@nestjs/platform-express';
+
+const server = express();
+let initialized = false;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  if (initialized) return;
+
+  
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(server),
+  );
 
   app.setGlobalPrefix('api');
 
@@ -36,10 +47,10 @@ async function bootstrap() {
     ]
   });
 
-  const port = process.env.PORT || 8000;
-  await app.listen(port, '0.0.0.0');
-
-  console.log(`Application is running on: http://localhost:${port}/api`);
+  await app.init();
+  initialized = true;
 }
 
 bootstrap();
+
+export default server;
