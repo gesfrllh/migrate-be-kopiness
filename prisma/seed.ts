@@ -1,15 +1,19 @@
 import { PrismaClient, RoastLevel, UserRole } from "@prisma/client";
-
+import * as argon2 from 'argon2'
+ 
 const prisma = new PrismaClient();
 
+
 async function main() {
+  
+  const hashed = await argon2.hash('adminPassword')
   const admin = await prisma.user.upsert({
     where: { email: "admin@kopi.com" },
     update: {},
     create: {
       name: "Admin Kopi",
       email: "admin@kopi.com",
-      password: "adminPassword",
+      password: hashed,
       role: UserRole.ADMIN,
     },
   });
