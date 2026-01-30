@@ -3,14 +3,21 @@ import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
 import { JwtGuard } from 'src/common/guards/jwt.guard';
-import { ApiBody, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiCreatedResponse,
+  ApiTags,
+  ApiBearerAuth
+} from '@nestjs/swagger';
 import { ProductResponseDto } from './dto/product.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decarotar';
 import type { JwtPayload } from 'jsonwebtoken';
-import { successResponse } from 'src/common/utils/api-response';
 import { ProductListResponseDto } from './dto/productListRespons.dto';
 import { PaginationQueryDto } from './dto/paginationQueryDto';
 
+@ApiTags('Product')
+@ApiBearerAuth()
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) { }
