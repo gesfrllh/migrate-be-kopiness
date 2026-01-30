@@ -3,17 +3,17 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { RegisterDto } from './dto/register.dto';
-import { UserResponseDto } from 'src/types/auth';
+import { UserResponseDto } from 'src/common/types/auth';
 import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
   async register(data: RegisterDto): Promise<UserResponseDto> {
     const exist: User | null = await this.prisma?.user?.findUnique({
       where: { email: data.email },
     });
-    
+
     if (exist) {
       throw new Error('Email already exists');
     }
@@ -74,4 +74,3 @@ export class AuthService {
   }
 
 }
-  
