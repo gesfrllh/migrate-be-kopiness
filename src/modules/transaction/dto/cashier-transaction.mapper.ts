@@ -7,6 +7,7 @@ export function mapToCashierDto(trx): CashierTransactionDto {
     productName: item.product.name,
     price: item.product.price,
     quantity: item.quantity,
+    stock: item.product.stock,
     subtotal: item.product.price * item.quantity,
   }))
 

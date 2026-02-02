@@ -15,4 +15,7 @@ export class CashierItemDto {
 
   @ApiProperty()
   subTotal: number
+
+  @ApiProperty()
+  stock: number
 }

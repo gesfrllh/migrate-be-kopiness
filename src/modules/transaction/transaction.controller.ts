@@ -6,6 +6,7 @@ import {
   Body,
   Req,
   UnauthorizedException,
+  Param,
 } from '@nestjs/common'
 import { TransactionService } from './transaction.service'
 import { JwtGuard } from 'src/common/guards/jwt.guard'
@@ -15,6 +16,7 @@ import {
   ApiOkResponse,
   ApiTags,
   ApiBearerAuth,
+  ApiParam,
 } from '@nestjs/swagger'
 import express from 'express'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
@@ -63,4 +65,27 @@ export class TransactionController {
   getCashierQueue(): Promise<CashierTransactionDto[]> {
     return this.transactionService.getCashierQueue()
   }
+
+  @Post(':id/payment')
+  @UseGuards(JwtGuard)
+  @ApiParam({ name: 'id', type: String })
+  @ApiOkResponse({
+    description: 'Transaction paid successfully'
+  })
+
+  pay(@Param('id') id: string) {
+    return this.transactionService.pay(id)
+  }
+
+  @Post(':id/cancel')
+  @UseGuards(JwtGuard)
+  @ApiParam({ name: 'id', type: String })
+  @ApiOkResponse({
+    description: 'Transaction cancelled',
+  })
+  cancel(@Param('id') id: string) {
+    return this.transactionService.cancel(id)
+  }
 }
+
+

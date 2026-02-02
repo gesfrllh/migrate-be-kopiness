@@ -113,5 +113,48 @@ export class TransactionService {
     })
   }
 
-  // async pay()
+  async pay(id: string) {
+    const trx = await this.prisma.transaction.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      }
+    })
+
+    if (!trx) throw new NotFoundException('Transaction not found')
+
+    if (trx.status !== TransactionStatus.PENDING) {
+      throw new BadRequestException('Transaction Cannot be paid')
+    }
+
+    for (const item of trx.items) {
+      if (item.product.stock < item.quantity) {
+        throw new BadRequestException(`Stock not enough for ${item.product.name}`)
+      }
+    }
+
+    await this.prisma.$transaction([
+      ...trx.items.map(item =>
+        this.prisma.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: {
+              decrement: item.quantity
+            }
+          }
+        })
+      ),
+
+      this.prisma.transaction.update({
+        where: { id },
+        data: {
+          status: TransactionStatus.PAID
+        }
+      })
+    ])
+
+    return { message: 'Payment Success' }
+  }
 }
