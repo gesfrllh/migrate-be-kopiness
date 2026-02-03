@@ -7,19 +7,20 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
-
+import cookieParser from 'cookie-parser';
 const server = express();
 let initialized = false;
 
 async function bootstrap() {
   if (initialized) return;
 
-  
+
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(server),
   );
 
+  app.use(cookieParser())
   app.setGlobalPrefix('api');
 
   // Swagger
@@ -35,7 +36,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(
     new ResponseInterceptor()
   )
-  
+
   // Enable CORS
   app.enableCors({
     origin: 'http://localhost:3000',
@@ -49,6 +50,11 @@ async function bootstrap() {
 
   await app.init();
   initialized = true;
+
+  const PORT = process.env.PORT || 3001;
+  await app.listen(PORT);
+  console.log(`🚀 Server running on http://localhost:${PORT}/api`);
+
 }
 
 bootstrap();

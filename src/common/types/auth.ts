@@ -10,3 +10,9 @@ export class UserResponseDto {
   email: string;
   role: UserRole;
 }
+
+export interface GoogleUser {
+  name?: string,
+  email: string,
+  providerId: string
+}
