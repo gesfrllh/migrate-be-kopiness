@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { RegisterDto } from './dto/register.dto';
-import { UserResponseDto } from 'src/common/types/auth';
+import { GoogleUser, UserResponseDto } from 'src/common/types/auth';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -41,9 +41,14 @@ export class AuthService {
     password: string,
   ): Promise<{ token: string; user: UserResponseDto }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user || !user.password) {
+      throw new BadRequestException('This Account uses google sign in')
+    }
+
     if (!user) throw new Error('Invalid credentials');
 
-    const valid = await argon2.verify(user.password, password);
+    const valid = await argon2.verify(user.password as string, password);
     if (!valid) throw new Error('Invalid credentials');
 
     const token = jwt.sign(
@@ -71,6 +76,40 @@ export class AuthService {
       where: { token },
     });
     return !!blacklisted;
+  }
+
+  async handleGoogleLogin(googleUser: GoogleUser) {
+    let user = await this.prisma.user.findUnique({
+      where: { email: googleUser.email },
+    })
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: googleUser.email,
+          name: googleUser.name ?? 'Google User',
+          role: 'CUSTOMER',
+          password: null,
+        },
+      })
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        provider: 'google',
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: '7d' },
+    )
+
+    const { password, ...safe } = user
+
+    return {
+      token,
+      user: safe,
+    }
   }
 
 }

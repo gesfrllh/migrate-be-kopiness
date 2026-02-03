@@ -1,9 +1,12 @@
-import { BadRequestException, Body, Controller, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { UserResponseDto } from 'src/common/types/auth';
-import { ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthGuard } from 'src/common/guards/google-auth.guard';
+import { JwtGuard } from 'src/common/guards/jwt.guard';
+import { JwtAuthGuard } from 'src/common/guards/jwt.auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -44,5 +47,38 @@ export class AuthController {
     if (!authHeader) throw new BadRequestException('Authorization header is missing');
 
     return this.authService.logout(authHeader);
+  }
+
+  @Get('google')
+  @UseGuards(GoogleAuthGuard)
+  googleAuth() { }
+
+  @Get('google/callback')
+  @UseGuards(GoogleAuthGuard)
+  async googleCallback(@Req() req, @Res() res) {
+    const { token } =
+      await this.authService.handleGoogleLogin(req.user)
+
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: false, // true kalau HTTPS
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
+
+    return res.redirect('http://localhost:3000/auth')
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  getMe(@Req() req) {
+    return {
+      isLoggedIn: true,
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        role: req.user.role
+      }
+    }
   }
 }
