@@ -31,6 +31,8 @@
     "@nestjs/platform-express": "9.4.3",
     "@nestjs/swagger": "5.2.1",
     "@prisma/client": "^4.14.1",
+    "@stablelib/nacl": "^2.0.1",
+    "@stablelib/random": "^2.0.1",
     "@supabase/supabase-js": "^2.89.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/jsonwebtoken": "^9.0.10",

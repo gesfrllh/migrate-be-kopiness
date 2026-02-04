@@ -52,13 +52,14 @@ export class AuthService {
     if (!valid) throw new Error('Invalid credentials');
 
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.id, role: user.role, email: user.email },
       process.env.JWT_SECRET || 'SECRET',
+      { expiresIn: '7d' }
     );
 
     const { password: _, ...safe } = user;
 
-    return { token, user: safe };
+    return { token, user: safe, };
   }
 
   async logout(authHeader?: string) {
@@ -68,7 +69,11 @@ export class AuthService {
     await this.prisma.blacklistedToken.create({
       data: { token },
     });
-    return { message: 'Successfully logged out' };
+    const payload = {
+      message: 'Successfully logged out',
+      isLoggedIn: false
+    }
+    return payload
   }
 
   async isBlacklisted(token: string): Promise<boolean> {
@@ -98,6 +103,7 @@ export class AuthService {
       {
         id: user.id,
         role: user.role,
+        email: user.email,
         provider: 'google',
       },
       process.env.JWT_SECRET!,

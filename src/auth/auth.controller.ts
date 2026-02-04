@@ -7,7 +7,7 @@ import { LoginDto } from './dto/login.dto';
 import { GoogleAuthGuard } from 'src/common/guards/google-auth.guard';
 import { JwtGuard } from 'src/common/guards/jwt.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt.auth.guard';
-
+import { encryptToken } from 'src/utils/crypto.utils';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) { }
@@ -34,19 +34,37 @@ export class AuthController {
       },
     },
   })
+  @Post('login')
   async login(
-    @Body() body: { email: string; password: string },
-  ): Promise<{ token: string; user: UserResponseDto }> {
-    return this.authService.login(body.email, body.password);
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) res,
+  ): Promise<{ user: UserResponseDto; isLoggedIn: boolean }> {
+    const { token, user } =
+      await this.authService.login(body.email, body.password);
+
+    const encryptedToken = encryptToken(token)
+    console.log(encryptedToken)
+
+    res.cookie('access_token', encryptedToken, {
+      httpOnly: true,
+      secure: false, // true di prod
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { user, isLoggedIn: true };
   }
 
-  @Post('logout')
-  @ApiResponse({ status: 200, schema: { example: { message: 'Successfully logged out' } } })
-  async logout(@Req() req): Promise<{ message: string }> {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) throw new BadRequestException('Authorization header is missing');
 
-    return this.authService.logout(authHeader);
+  @Post('logout')
+  async logout(@Res({ passthrough: true }) res) {
+    res.setHeader(
+      'Set-Cookie',
+      'access_token=; HttpOnly; Path=/; Max-Age=0',
+    )
+
+    return { message: 'Successfully logged out', isLoggedIn: false }
   }
 
   @Get('google')
@@ -56,18 +74,21 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req, @Res() res) {
-    const { token } =
-      await this.authService.handleGoogleLogin(req.user)
+    const { token } = await this.authService.handleGoogleLogin(req.user)
 
-    res.cookie('access_token', token, {
+    const encryptedToken = encryptToken(token)
+
+    res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: false, // true kalau HTTPS
+      secure: false, // true di prod
       sameSite: 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
+    });
 
     return res.redirect('http://localhost:3000/auth')
   }
+
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
