@@ -33,13 +33,33 @@ export class TransactionService {
       }
     }
 
+    const product = await this.prisma.product.findMany({
+      where: {
+        id: { in: dto.items.map(i => i.productId) }
+      }
+    })
+
+    const productMap = new Map(
+      product.map(p => [p.id, p])
+    )
+
+    const total = dto.items.reduce((sum, item) => {
+      const prdct = productMap.get(item.productId)
+
+      if (!prdct) {
+        throw new Error(`Product ${item.productId} not Found`)
+      }
+
+      return sum + prdct.price * item.quantity
+    }, 0)
+
     // 2️⃣ WRITE (BATCH TRANSACTION — STABLE)
     const [transaction] = await this.prisma.$transaction([
       this.prisma.transaction.create({
         data: {
           createdById: userId,
           status: 'PENDING',
-          total: 0,
+          total: total,
           items: {
             create: dto.items.map(item => ({
               productId: item.productId,
