@@ -39,7 +39,7 @@ export class AuthService {
   async login(
     email: string,
     password: string,
-  ): Promise<{ cookie: string; user: UserResponseDto }> {
+  ): Promise<{ token: string; user: UserResponseDto }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user || !user.password) {
@@ -56,11 +56,10 @@ export class AuthService {
       process.env.JWT_SECRET || 'SECRET',
       { expiresIn: '7d' }
     );
-    const cookie =
-      `access_token=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`
+
     const { password: _, ...safe } = user;
 
-    return { cookie, user: safe };
+    return { token, user: safe, };
   }
 
   async logout(authHeader?: string) {
@@ -70,7 +69,11 @@ export class AuthService {
     await this.prisma.blacklistedToken.create({
       data: { token },
     });
-    return { message: 'Successfully logged out' };
+    const payload = {
+      message: 'Successfully logged out',
+      isLoggedIn: false
+    }
+    return payload
   }
 
   async isBlacklisted(token: string): Promise<boolean> {
@@ -107,12 +110,10 @@ export class AuthService {
       { expiresIn: '7d' },
     )
 
-    const cookie =
-      `access_token=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`
     const { password, ...safe } = user
 
     return {
-      cookie,
+      token,
       user: safe,
     }
   }

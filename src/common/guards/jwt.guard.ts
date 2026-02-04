@@ -18,25 +18,20 @@ export class JwtGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
 
-    // 🔑 1. Ambil token dari COOKIE
     const encryptedToken = req.cookies?.access_token;
     if (!encryptedToken) {
       throw new UnauthorizedException('No token provided');
     }
 
-    // 🔓 2. Decrypt
     const token = decryptToken(encryptedToken);
     if (!token) {
       throw new UnauthorizedException('Invalid token');
     }
-
-    // 🚫 3. Blacklist check
     const isBlacklisted = await this.authService.isBlacklisted(token);
     if (isBlacklisted) {
       throw new UnauthorizedException('Token has been blacklisted');
     }
 
-    // ✅ 4. Verify JWT
     try {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET,

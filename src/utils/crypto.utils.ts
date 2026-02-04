@@ -1,27 +1,53 @@
-// utils/crypto.ts
-import { secretBox, openSecretBox } from "@stablelib/nacl";
-import { randomBytes } from "@stablelib/random";
+import crypto from 'crypto'
 
-const SECRETBOX_KEY_LENGTH = 32;
-const SECRETBOX_NONCE_LENGTH = 24;
-export const SECRET_KEY = randomBytes(SECRETBOX_KEY_LENGTH);
+const ALGO = 'aes-256-gcm'
+const IV_LENGTH = 12 // recommended for GCM
+
+const KEY = new Uint8Array(Buffer.from(process.env.SECRET_KEY!, 'hex'))
+if (KEY.length !== 32) {
+  throw new Error('SECRET_KEY must be 32 bytes (64 hex chars)')
+}
 
 export function encryptToken(token: string): string {
-  const nonce = randomBytes(SECRETBOX_NONCE_LENGTH);
-  const ciphertext = secretBox(new TextEncoder().encode(token), nonce, SECRET_KEY);
-  return Buffer.from(nonce).toString("hex") + ":" + Buffer.from(ciphertext).toString("hex");
+  const iv = new Uint8Array(crypto.randomBytes(IV_LENGTH))
+  const cipher = crypto.createCipheriv(ALGO, KEY, iv)
+
+  const encrypted = Buffer.concat([
+    new Uint8Array(cipher.update(token, 'utf8')),
+    new Uint8Array(cipher.final()),
+  ])
+
+  const tag = cipher.getAuthTag()
+
+  return [
+    Buffer.from(iv).toString('hex'),
+    tag.toString('hex'),
+    encrypted.toString('hex'),
+  ].join(':')
 }
 
 export function decryptToken(data: string): string | null {
-  const [nonceHex, ciphertextHex] = data.split(":");
-  const nonce = new Uint8Array(Buffer.from(nonceHex, "hex"));
-  const ciphertext = new Uint8Array(Buffer.from(ciphertextHex, "hex"));
+  try {
+    const [ivHex, tagHex, encryptedHex] = data.split(':')
 
-  const decrypted = openSecretBox(ciphertext, nonce, SECRET_KEY);
-  if (!decrypted) return null;
-  return new TextDecoder().decode(decrypted);
+    const iv = new Uint8Array(Buffer.from(ivHex, 'hex'))
+    const tag = new Uint8Array(Buffer.from(tagHex, 'hex'))
+    const encrypted = new Uint8Array(Buffer.from(encryptedHex, 'hex'))
+
+    const decipher = crypto.createDecipheriv(ALGO, KEY, iv)
+    decipher.setAuthTag(tag)
+
+    const decrypted = Buffer.concat([
+      new Uint8Array(decipher.update(encrypted)),
+      new Uint8Array(decipher.final()),
+    ])
+
+    return decrypted.toString('utf8')
+  } catch {
+    return null
+  }
 }
 
-export function buildHttpOnlyCookie(encryptedToken: string): string {
-  return `access_token=${encryptedToken}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+export function buildHttpOnlyCookie(token: string) {
+  return `access_token=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
 }

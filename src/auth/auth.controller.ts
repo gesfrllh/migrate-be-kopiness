@@ -7,8 +7,7 @@ import { LoginDto } from './dto/login.dto';
 import { GoogleAuthGuard } from 'src/common/guards/google-auth.guard';
 import { JwtGuard } from 'src/common/guards/jwt.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt.auth.guard';
-import { Response, Request } from 'express';
-
+import { encryptToken } from 'src/utils/crypto.utils';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) { }
@@ -39,16 +38,24 @@ export class AuthController {
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res,
-  ): Promise<{ user: UserResponseDto }> {
-    const { cookie, user } = await this.authService.login(
-      body.email,
-      body.password,
-    )
+  ): Promise<{ user: UserResponseDto; isLoggedIn: boolean }> {
+    const { token, user } =
+      await this.authService.login(body.email, body.password);
 
-    res.setHeader('Set-Cookie', cookie)
+    const encryptedToken = encryptToken(token)
+    console.log(encryptedToken)
 
-    return { user }
+    res.cookie('access_token', encryptedToken, {
+      httpOnly: true,
+      secure: false, // true di prod
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { user, isLoggedIn: true };
   }
+
 
   @Post('logout')
   async logout(@Res({ passthrough: true }) res) {
@@ -57,7 +64,7 @@ export class AuthController {
       'access_token=; HttpOnly; Path=/; Max-Age=0',
     )
 
-    return { message: 'Successfully logged out' }
+    return { message: 'Successfully logged out', isLoggedIn: false }
   }
 
   @Get('google')
@@ -67,9 +74,17 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req, @Res() res) {
-    const { cookie } = await this.authService.handleGoogleLogin(req.user)
+    const { token } = await this.authService.handleGoogleLogin(req.user)
 
-    res.setHeader('Set-Cookie', cookie)
+    const encryptedToken = encryptToken(token)
+
+    res.cookie('access_token', encryptedToken, {
+      httpOnly: true,
+      secure: false, // true di prod
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     return res.redirect('http://localhost:3000/auth')
   }
