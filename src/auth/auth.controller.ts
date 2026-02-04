@@ -43,7 +43,6 @@ export class AuthController {
       await this.authService.login(body.email, body.password);
 
     const encryptedToken = encryptToken(token)
-    console.log(encryptedToken)
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
