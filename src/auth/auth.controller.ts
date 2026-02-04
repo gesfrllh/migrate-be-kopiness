@@ -7,6 +7,7 @@ import { LoginDto } from './dto/login.dto';
 import { GoogleAuthGuard } from 'src/common/guards/google-auth.guard';
 import { JwtGuard } from 'src/common/guards/jwt.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt.auth.guard';
+import { Response, Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -34,19 +35,29 @@ export class AuthController {
       },
     },
   })
+  @Post('login')
   async login(
-    @Body() body: { email: string; password: string },
-  ): Promise<{ token: string; user: UserResponseDto }> {
-    return this.authService.login(body.email, body.password);
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) res,
+  ): Promise<{ user: UserResponseDto }> {
+    const { cookie, user } = await this.authService.login(
+      body.email,
+      body.password,
+    )
+
+    res.setHeader('Set-Cookie', cookie)
+
+    return { user }
   }
 
   @Post('logout')
-  @ApiResponse({ status: 200, schema: { example: { message: 'Successfully logged out' } } })
-  async logout(@Req() req): Promise<{ message: string }> {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) throw new BadRequestException('Authorization header is missing');
+  async logout(@Res({ passthrough: true }) res) {
+    res.setHeader(
+      'Set-Cookie',
+      'access_token=; HttpOnly; Path=/; Max-Age=0',
+    )
 
-    return this.authService.logout(authHeader);
+    return { message: 'Successfully logged out' }
   }
 
   @Get('google')
@@ -56,18 +67,13 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   async googleCallback(@Req() req, @Res() res) {
-    const { token } =
-      await this.authService.handleGoogleLogin(req.user)
+    const { cookie } = await this.authService.handleGoogleLogin(req.user)
 
-    res.cookie('access_token', token, {
-      httpOnly: true,
-      secure: false, // true kalau HTTPS
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
+    res.setHeader('Set-Cookie', cookie)
 
     return res.redirect('http://localhost:3000/auth')
   }
+
 
   @Get('me')
   @UseGuards(JwtAuthGuard)

@@ -39,7 +39,7 @@ export class AuthService {
   async login(
     email: string,
     password: string,
-  ): Promise<{ token: string; user: UserResponseDto }> {
+  ): Promise<{ cookie: string; user: UserResponseDto }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user || !user.password) {
@@ -52,13 +52,15 @@ export class AuthService {
     if (!valid) throw new Error('Invalid credentials');
 
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      { id: user.id, role: user.role, email: user.email },
       process.env.JWT_SECRET || 'SECRET',
+      { expiresIn: '7d' }
     );
-
+    const cookie =
+      `access_token=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`
     const { password: _, ...safe } = user;
 
-    return { token, user: safe };
+    return { cookie, user: safe };
   }
 
   async logout(authHeader?: string) {
@@ -98,16 +100,19 @@ export class AuthService {
       {
         id: user.id,
         role: user.role,
+        email: user.email,
         provider: 'google',
       },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' },
     )
 
+    const cookie =
+      `access_token=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`
     const { password, ...safe } = user
 
     return {
-      token,
+      cookie,
       user: safe,
     }
   }
