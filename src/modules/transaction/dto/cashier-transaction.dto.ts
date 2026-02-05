@@ -24,4 +24,7 @@ export class CashierTransactionDto {
 
   @ApiProperty()
   estimatedTotal: number
+
+  @ApiProperty()
+  orderNumber: string
 }

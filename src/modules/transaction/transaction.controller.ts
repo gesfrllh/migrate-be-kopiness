@@ -21,6 +21,7 @@ import {
 import express from 'express'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { CashierTransactionDto } from './dto/cashier-transaction.dto'
+import { PayTransactionsDto, PayTransactionsResponseDto } from './dto/cashier-payment.dto'
 
 @ApiTags('Transaction')
 @ApiBearerAuth()
@@ -66,16 +67,17 @@ export class TransactionController {
     return this.transactionService.getCashierQueue()
   }
 
-  @Post(':id/payment')
+  @Post('payment')
   @UseGuards(JwtGuard)
-  @ApiParam({ name: 'id', type: String })
+  @ApiBody({ type: PayTransactionsDto })
   @ApiOkResponse({
-    description: 'Transaction paid successfully'
+    description: 'Transactions paid successfully',
+    type: PayTransactionsResponseDto,
   })
-
-  pay(@Param('id') id: string) {
-    return this.transactionService.pay(id)
+  payMultiple(@Body() dto: PayTransactionsDto) {
+    return this.transactionService.pay(dto)
   }
+
 
   @Post(':id/cancel')
   @UseGuards(JwtGuard)
@@ -86,6 +88,8 @@ export class TransactionController {
   cancel(@Param('id') id: string) {
     return this.transactionService.cancel(id)
   }
+
+
 }
 
 
