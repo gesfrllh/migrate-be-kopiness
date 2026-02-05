@@ -34,6 +34,8 @@ model Product {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   items       TransactionItem[]
+
+  @@index([createdById]) // ✅ Index untuk query by creator
 }
 
 enum RoastLevel {
@@ -43,22 +45,38 @@ enum RoastLevel {
 }
 
 model TransactionItem {
-  id            String      @id @default(uuid())
-  quantity      Int
-  product       Product     @relation(fields: [productId], references: [id])
-  productId     String
+  id       String @id @default(uuid())
+  quantity Int
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
   transaction   Transaction @relation(fields: [transactionId], references: [id])
   transactionId String
+
+  @@index([transactionId]) // ✅ Index untuk join
+  @@index([productId]) // ✅ Index untuk join
 }
 
 model Transaction {
   id          String            @id @default(uuid())
+  orderNumber String?           @unique
   total       Int
   status      TransactionStatus @default(PENDING)
-  items       TransactionItem[]
-  createdAt   DateTime          @default(now())
-  createdBy   User              @relation(fields: [createdById], references: [id])
+
+  items TransactionItem[]
+
+  createdAt DateTime @default(now())
+
+  createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
+
+  paymentId String?
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([status, createdAt]) // ✅ PENTING: Index untuk getCashierQueue
+  @@index([createdById]) // ✅ Index untuk query by user
+  @@index([paymentId]) // ✅ Index untuk query by payment
 }
 
 enum TransactionStatus {
@@ -76,4 +94,32 @@ model BlacklistedToken {
   id        String   @id @default(uuid())
   token     String   @unique
   createdAt DateTime @default(now())
+
+  @@index([createdAt]) // ✅ Index untuk cleanup old tokens
+}
+
+model orderSequence {
+  date  String @id
+  value Int
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  totalAmount   Int
+  method        PaymentMethod
+
+  createdAt DateTime @default(now())
+  paidAt    DateTime
+
+  transactions Transaction[]
+
+  @@index([createdAt]) // ✅ Index untuk query by date
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  TRANSFER
+  DEBIT
 }

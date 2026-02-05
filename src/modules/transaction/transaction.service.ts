@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
-import { TransactionStatus } from "@prisma/client";
+import { PaymentMethod, TransactionStatus } from "@prisma/client";
 import { mapToCashierDto } from "./dto/cashier-transaction.mapper";
 import { CashierTransactionDto } from "./dto/cashier-transaction.dto";
+import { formatOrderNumber, generateInvoiceNumber } from "src/common/utils/general";
+import { PayTransactionsDto } from "./dto/cashier-payment.dto";
 
 @Injectable()
 export class TransactionService {
@@ -14,92 +16,130 @@ export class TransactionService {
     dto: CreateTransactionDto,
   ): Promise<CashierTransactionDto> {
 
-    // 1️⃣ VALIDASI (READ ONLY)
-    const products = await this.prisma.product.findMany({
-      where: {
-        id: { in: dto.items.map(i => i.productId) },
-      },
-    })
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const productId = dto.items.map(i => i.productId)
+
+    // ✅ PARALLEL
+    const [products, seq] = await Promise.all([
+      this.prisma.product.findMany({
+        where: { id: { in: productId } },
+        select: { id: true, name: true, price: true, stock: true }
+      }),
+      this.prisma.orderSequence.upsert({
+        where: { date: today },
+        update: { value: { increment: 1 } },
+        create: { date: today, value: 1 }
+      })
+    ])
+
+    const productMap = new Map(products.map(p => [p.id, p]))
+    let total = 0
 
     for (const item of dto.items) {
-      const product = products.find(p => p.id === item.productId)
+      const product = productMap.get(item.productId)
       if (!product) {
-        throw new NotFoundException('Product not found')
+        throw new NotFoundException(`Product ${item.productId} not found`)
       }
       if (product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Stock not enough for ${product.name}`,
-        )
+        throw new BadRequestException(`Stock not enough for ${product.name}`)
       }
+      total += product.price * item.quantity
     }
 
-    const product = await this.prisma.product.findMany({
-      where: {
-        id: { in: dto.items.map(i => i.productId) }
-      }
+    const orderNumber = formatOrderNumber(today, seq.value)
+
+    // ✅ SPLIT: Buat transaction dulu, items terpisah (LEBIH CEPAT)
+    const transactionId = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.transaction.create({
+        data: {
+          orderNumber,
+          createdBy: { connect: { id: userId } },
+          status: TransactionStatus.PENDING,
+          total,
+        },
+        select: { id: true }
+      })
+
+      // ✅ Batch insert items (1 query untuk semua items)
+      await tx.transactionItem.createMany({
+        data: dto.items.map(item => ({
+          transactionId: created.id,
+          productId: item.productId,
+          quantity: item.quantity
+        }))
+      })
+
+      return created.id
     })
 
-    const productMap = new Map(
-      product.map(p => [p.id, p])
-    )
-
-    const total = dto.items.reduce((sum, item) => {
-      const prdct = productMap.get(item.productId)
-
-      if (!prdct) {
-        throw new Error(`Product ${item.productId} not Found`)
+    // ✅ Query final result di luar transaction
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        createdBy: {
+          select: { id: true, name: true, email: true }
+        },
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            product: {
+              select: { id: true, name: true, price: true }
+            }
+          }
+        }
       }
-
-      return sum + prdct.price * item.quantity
-    }, 0)
-
-    // 2️⃣ WRITE (BATCH TRANSACTION — STABLE)
-    const [transaction] = await this.prisma.$transaction([
-      this.prisma.transaction.create({
-        data: {
-          createdById: userId,
-          status: 'PENDING',
-          total: total,
-          items: {
-            create: dto.items.map(item => ({
-              productId: item.productId,
-              quantity: item.quantity,
-            })),
-          },
-        },
-        include: {
-          items: { include: { product: true } },
-          createdBy: true,
-        },
-      }),
-    ])
+    })
 
     return mapToCashierDto(transaction)
   }
-
-
-
   async getCashierQueue() {
-    const transaction = this.prisma.transaction.findMany({
+    // ✅ Pastikan ada index di schema.prisma:
+    // @@index([status, createdAt])
+
+    const transactions = await this.prisma.transaction.findMany({
       where: {
         status: TransactionStatus.PENDING,
       },
       orderBy: {
         createdAt: 'asc'
       },
-      include: {
-        items: {
-          include: {
-            product: true,
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
           }
         },
-        createdBy: true
-      }
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true
+              }
+            }
+          }
+        }
+      },
+      take: 50 // ✅ Limit hasil kalau banyak (optional)
     })
-
-    return (await transaction).map(mapToCashierDto)
+    return transactions.map(mapToCashierDto)
   }
-
   async getById(id: string) {
     const trx = await this.prisma.transaction.findUnique({
       where: { id },
@@ -133,9 +173,13 @@ export class TransactionService {
     })
   }
 
-  async pay(id: string) {
-    const trx = await this.prisma.transaction.findUnique({
-      where: { id },
+  async pay(dto: PayTransactionsDto) {
+    const { transactionIds, method } = dto
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        id: { in: transactionIds }
+      },
       include: {
         items: {
           include: { product: true }
@@ -143,38 +187,81 @@ export class TransactionService {
       }
     })
 
-    if (!trx) throw new NotFoundException('Transaction not found')
-
-    if (trx.status !== TransactionStatus.PENDING) {
-      throw new BadRequestException('Transaction Cannot be paid')
+    if (transactions.length !== transactionIds.length) {
+      throw new NotFoundException('Some transaction not found')
     }
 
-    for (const item of trx.items) {
-      if (item.product.stock < item.quantity) {
-        throw new BadRequestException(`Stock not enough for ${item.product.name}`)
+    for (const trx of transactions) {
+      if (trx.status !== TransactionStatus.PENDING) {
+        throw new BadRequestException(`Transaction ${trx.id} cannot be paid`)
+      }
+
+      for (const items of trx.items) {
+        if (items.product.stock < items.quantity) {
+          throw new BadRequestException(`Stock not enough for ${items.product.name}`)
+        }
       }
     }
 
-    await this.prisma.$transaction([
-      ...trx.items.map(item =>
-        this.prisma.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity
-            }
-          }
-        })
-      ),
+    const totalAmount = transactions.reduce(
+      (sum, trx) => sum + trx.total,
+      0
+    )
 
-      this.prisma.transaction.update({
-        where: { id },
+    const invoiceNumber = generateInvoiceNumber()
+    const paidAt = new Date()
+
+    const result = await this.prisma.$transaction(async tx => {
+      for (const trx of transactions) {
+        for (const item of trx.items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: {
+                decrement: item.quantity
+              }
+            }
+          })
+        }
+      }
+
+      const payment = await tx.payment.create({
         data: {
-          status: TransactionStatus.PAID
+          invoiceNumber,
+          totalAmount,
+          method,
+          paidAt
         }
       })
-    ])
 
-    return { message: 'Payment Success' }
+      const updateTransaction = await Promise.all(
+        transactions.map(trx =>
+          tx.transaction.update({
+            where: { id: trx.id },
+            data: {
+              status: TransactionStatus.PAID,
+              paymentId: payment.id
+            },
+            include: {
+              items: {
+                include: {
+                  product: true
+                }
+              }
+            }
+          })
+        )
+      )
+      return {
+        payment,
+        transaction: updateTransaction
+      }
+    })
+
+    return {
+      mesage: 'Payment success',
+      payment: result.payment,
+      transaction: result.transaction
+    }
   }
 }

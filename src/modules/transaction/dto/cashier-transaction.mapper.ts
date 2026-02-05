@@ -15,6 +15,7 @@ export function mapToCashierDto(trx): CashierTransactionDto {
     id: trx.id,
     status: trx.status,
     createdAt: trx.createdAt,
+    orderNumber: trx.orderNumber,
 
     user: {
       id: trx.createdBy.id,

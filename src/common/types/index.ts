@@ -1,0 +1,1 @@
+export type PaymentMethod = 'CASH' | 'QRIS' | 'TRANSFER' | 'DEBIT'
