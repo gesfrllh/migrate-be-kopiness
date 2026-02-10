@@ -6,10 +6,14 @@ import { mapToCashierDto } from "./dto/cashier-transaction.mapper";
 import { CashierTransactionDto } from "./dto/cashier-transaction.dto";
 import { formatOrderNumber, generateInvoiceNumber } from "src/common/utils/general";
 import { PayTransactionsDto } from "./dto/cashier-payment.dto";
+import { PaymentService } from "../payment/payment.service";
 
 @Injectable()
 export class TransactionService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private paymentService: PaymentService
+  ) { }
 
   async createFromCart(
     userId: string,
@@ -175,6 +179,11 @@ export class TransactionService {
 
   async pay(dto: PayTransactionsDto) {
     const { transactionIds, method } = dto
+
+    const paymentMethod = this.paymentService.getMethodById(method)
+    if (!paymentMethod) {
+      throw new BadRequestException('Payment method not Valid!')
+    }
 
     const transactions = await this.prisma.transaction.findMany({
       where: {
