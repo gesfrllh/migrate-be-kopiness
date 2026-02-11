@@ -1,13 +1,12 @@
 import { BadRequestException, Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
-import { UserResponseDto } from 'src/common/types/auth';
-import { ApiBody, ApiResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UserResponseDto } from '../common/types/auth';
+import { ApiBody, ApiResponse, } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
-import { GoogleAuthGuard } from 'src/common/guards/google-auth.guard';
-import { JwtGuard } from 'src/common/guards/jwt.guard';
-import { JwtAuthGuard } from 'src/common/guards/jwt.auth.guard';
-import { encryptToken } from 'src/utils/crypto.utils';
+import { GoogleAuthGuard } from '../common/guards/google-auth.guard';
+import { JwtAuthGuard } from '../common/guards/jwt.auth.guard';
+import { encryptToken } from '../utils/crypto.utils';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) { }

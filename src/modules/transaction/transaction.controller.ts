@@ -9,7 +9,7 @@ import {
   Param,
 } from '@nestjs/common'
 import { TransactionService } from './transaction.service'
-import { JwtGuard } from 'src/common/guards/jwt.guard'
+import { JwtGuard } from '../../common/guards/jwt.guard'
 import {
   ApiBody,
   ApiCreatedResponse,

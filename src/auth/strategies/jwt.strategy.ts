@@ -1,7 +1,7 @@
 import { PassportStrategy } from '@nestjs/passport'
 import { Strategy, ExtractJwt } from 'passport-jwt'
 import { Injectable } from '@nestjs/common'
-import { decryptToken, encryptToken } from 'src/utils/crypto.utils'
+import { decryptToken, encryptToken } from '../../utils/crypto.utils'
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {

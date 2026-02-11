@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards, Quer
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
-import { JwtGuard } from 'src/common/guards/jwt.guard';
+import { JwtGuard } from '../../common/guards/jwt.guard';
 import {
   ApiBody,
   ApiOkResponse,
@@ -11,7 +11,7 @@ import {
   ApiBearerAuth
 } from '@nestjs/swagger';
 import { ProductResponseDto } from './dto/product.dto';
-import { CurrentUser } from 'src/auth/decorators/current-user.decarotar';
+import { CurrentUser } from '../../auth/decorators/current-user.decarotar';
 import type { JwtPayload } from 'jsonwebtoken';
 import { ProductListResponseDto } from './dto/productListRespons.dto';
 import { PaginationQueryDto } from './dto/paginationQueryDto';
