@@ -3,7 +3,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
-import JwtBlacklistGuard from 'src/common/guards/jwt-blacklist.guard';
+import JwtBlacklistGuard from '../common/guards/jwt-blacklist.guard';
 import { ConfigModule } from '@nestjs/config';
 import googleOauthConfig from './config/google-oauth.config';
 import { GoogleStrategy } from './strategies/google.stragety';

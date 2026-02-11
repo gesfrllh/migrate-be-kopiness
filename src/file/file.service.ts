@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { supabase } from 'src/lib/supabase';
+import { supabase } from '../lib/supabase';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -32,7 +32,7 @@ export class FileService {
     const { data: publicUrl } = supabase.storage
       .from('s3')
       .getPublicUrl(fileName);
-    
+
     return {
       path: data.path,
       url: publicUrl.publicUrl,

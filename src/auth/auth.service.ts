@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { RegisterDto } from './dto/register.dto';
-import { GoogleUser, UserResponseDto } from 'src/common/types/auth';
+import { GoogleUser, UserResponseDto } from '../common/types/auth';
 import { User } from '@prisma/client';
 
 @Injectable()

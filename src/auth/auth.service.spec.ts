@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
-import * as jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 
