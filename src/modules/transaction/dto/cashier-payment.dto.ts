@@ -14,7 +14,7 @@ export class PayTransactionsDto {
 
   @ApiProperty({
     enum: PaymentMethod,
-    example: PaymentMethod.CASH
+    example: PaymentMethod.dana
   })
   @IsEnum(PaymentMethod)
   method: PaymentMethod

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
-import { PaymentMethod, TransactionStatus } from "@prisma/client";
+import { PaymentMethod, Transaction, TransactionStatus } from "@prisma/client";
 import { mapToCashierDto } from "./dto/cashier-transaction.mapper";
 import { CashierTransactionDto } from "./dto/cashier-transaction.dto";
 import { formatOrderNumber, generateInvoiceNumber } from "src/common/utils/general";
@@ -185,54 +185,56 @@ export class TransactionService {
       throw new BadRequestException('Payment method not Valid!')
     }
 
-    const transactions = await this.prisma.transaction.findMany({
-      where: {
-        id: { in: transactionIds }
-      },
-      include: {
-        items: {
-          include: { product: true }
+    return this.prisma.$transaction(async (tx) => {
+
+      const transactions = await tx.transaction.findMany({
+        where: {
+          id: { in: transactionIds },
+          status: TransactionStatus.PENDING
+        },
+        include: {
+          items: true
         }
-      }
-    })
+      })
 
-    if (transactions.length !== transactionIds.length) {
-      throw new NotFoundException('Some transaction not found')
-    }
-
-    for (const trx of transactions) {
-      if (trx.status !== TransactionStatus.PENDING) {
-        throw new BadRequestException(`Transaction ${trx.id} cannot be paid`)
+      if (transactions.length !== transactionIds.length) {
+        throw new NotFoundException('Some transaction not found')
       }
 
-      for (const items of trx.items) {
-        if (items.product.stock < items.quantity) {
-          throw new BadRequestException(`Stock not enough for ${items.product.name}`)
-        }
-      }
-    }
+      const totalAmount = transactions.reduce(
+        (sum, trx) => sum + trx.total,
+        0
+      )
 
-    const totalAmount = transactions.reduce(
-      (sum, trx) => sum + trx.total,
-      0
-    )
+      const invoiceNumber = generateInvoiceNumber()
+      const paidAt = new Date()
 
-    const invoiceNumber = generateInvoiceNumber()
-    const paidAt = new Date()
-
-    const result = await this.prisma.$transaction(async tx => {
-      for (const trx of transactions) {
-        for (const item of trx.items) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: {
-                decrement: item.quantity
+      // 🔥 Atomic stock update (no manual check)
+      await Promise.all(
+        transactions.flatMap(trx =>
+          trx.items.map(async item => {
+            const result = await tx.product.updateMany({
+              where: {
+                id: item.productId,
+                stock: {
+                  gte: item.quantity
+                }
+              },
+              data: {
+                stock: {
+                  decrement: item.quantity
+                }
               }
+            })
+
+            if (result.count === 0) {
+              throw new BadRequestException(
+                `Stock not enough for product ${item.productId}`
+              )
             }
           })
-        }
-      }
+        )
+      )
 
       const payment = await tx.payment.create({
         data: {
@@ -243,34 +245,23 @@ export class TransactionService {
         }
       })
 
-      const updateTransaction = await Promise.all(
-        transactions.map(trx =>
-          tx.transaction.update({
-            where: { id: trx.id },
-            data: {
-              status: TransactionStatus.PAID,
-              paymentId: payment.id
-            },
-            include: {
-              items: {
-                include: {
-                  product: true
-                }
-              }
-            }
-          })
-        )
-      )
+      await tx.transaction.updateMany({
+        where: {
+          id: { in: transactionIds }
+        },
+        data: {
+          status: TransactionStatus.PAID,
+          paymentId: payment.id
+        }
+      })
+
       return {
-        payment,
-        transaction: updateTransaction
+        message: 'Payment success',
+        payment
       }
     })
 
-    return {
-      mesage: 'Payment success',
-      payment: result.payment,
-      transaction: result.transaction
-    }
   }
+
+
 }

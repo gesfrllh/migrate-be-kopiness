@@ -118,8 +118,8 @@ model Payment {
 }
 
 enum PaymentMethod {
-  CASH
-  QRIS
-  TRANSFER
-  DEBIT
+  sopay
+  dana
+  gopay
+  qris
 }
