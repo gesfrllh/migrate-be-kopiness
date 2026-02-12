@@ -16,7 +16,7 @@ export class AiController {
   })
   async coffeAssistant(@Body() dto: CoffeeAssistantDto) {
     try {
-      const result = await this.aiService.generateCoffeGuide(dto);
+      const result = await this.aiService.adjustCoffee(dto);
 
       return {
         success: true,

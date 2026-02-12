@@ -1,9 +1,10 @@
 // src/payment/payment.controller.ts
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common'
+import { Controller, Get, Param, NotFoundException, UseGuards } from '@nestjs/common'
 import { PaymentService } from './payment.service'
 import { ApiOkResponse, ApiTags, ApiParam } from '@nestjs/swagger'
 import { ListPaymentMethodsDto } from './dto/list-payment.dto'
 import { PaymentMethodDto } from './dto/get-payment.dto'
+import { JwtGuard } from '../../common/guards/jwt.guard'
 
 @ApiTags('Payment')
 @Controller('payment-methods')
@@ -14,6 +15,7 @@ export class PaymentController {
    * Ambil semua payment methods
    */
   @Get()
+  @UseGuards(JwtGuard)
   @ApiOkResponse({
     description: 'List of available payment methods',
     type: ListPaymentMethodsDto,
@@ -26,6 +28,7 @@ export class PaymentController {
    * Ambil detail payment method by ID
    */
   @Get(':id')
+  @UseGuards(JwtGuard)
   @ApiParam({ name: 'id', description: 'Payment method ID', example: 'credit_card' })
   @ApiOkResponse({
     description: 'Payment method detail',

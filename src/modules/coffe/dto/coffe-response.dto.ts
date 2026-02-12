@@ -17,6 +17,12 @@ export class CoffeeGuideDto {
   ratio?: number;
 
   @ApiProperty({ required: false })
+  title?: string;
+
+  @ApiProperty({ required: false })
+  description?: string;
+
+  @ApiProperty({ required: false })
   waterTemp?: number;
 
   @ApiProperty({ required: false })
