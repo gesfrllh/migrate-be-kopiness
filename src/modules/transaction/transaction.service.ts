@@ -103,8 +103,6 @@ export class TransactionService {
     return mapToCashierDto(transaction)
   }
   async getCashierQueue() {
-    // ✅ Pastikan ada index di schema.prisma:
-    // @@index([status, createdAt])
 
     const transactions = await this.prisma.transaction.findMany({
       where: {
