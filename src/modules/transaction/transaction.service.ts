@@ -1,12 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
-import { PaymentMethod, Transaction, TransactionStatus } from "@prisma/client";
+import { PaymentMethod, Transaction, TransactionStatus, UserRole } from "@prisma/client";
 import { mapToCashierDto } from "./dto/cashier-transaction.mapper";
 import { CashierTransactionDto } from "./dto/cashier-transaction.dto";
 import { formatOrderNumber, generateInvoiceNumber } from "src/common/utils/general";
 import { PayTransactionsDto } from "./dto/cashier-payment.dto";
 import { PaymentService } from "../payment/payment.service";
+import { AdminHistoryQueryDto } from "./dto/admin-history-query.dto";
+import { UserHistoryQueryDto } from "./dto/user-history-query.dto";
+import { TransactionMapper } from "./dto/transaction.mapper";
 
 @Injectable()
 export class TransactionService {
@@ -260,6 +263,161 @@ export class TransactionService {
     })
 
   }
+  // ===================================
+  // ADMIN SUMMARY
+  // ===================================
+  async getAdminSummary() {
+    const today = new Date()
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0))
 
+    const [totalRevenue, todayRevenue, totalTransactions] =
+      await Promise.all([
+        this.prisma.transaction.aggregate({
+          _sum: { total: true },
+          where: { status: 'PAID' },
+        }),
+        this.prisma.transaction.aggregate({
+          _sum: { total: true },
+          where: {
+            status: 'PAID',
+            createdAt: { gte: startOfDay },
+          },
+        }),
+        this.prisma.transaction.count({
+          where: { status: 'PAID' },
+        }),
+      ])
+
+    return {
+      totalRevenue: totalRevenue._sum.total || 0,
+      todayRevenue: todayRevenue._sum.total || 0,
+      totalTransactions,
+    }
+  }
+
+  async getDetail(id: string) {
+    const trx = this.prisma.transaction.findUnique({
+      where: { id },
+      include: {
+        createdBy:
+        {
+          select:
+          {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        payment: true,
+        items: {
+          include: {
+            product: true
+          }
+        }
+      }
+    })
+
+    if (!trx) {
+      throw new NotFoundException('Transaction not found')
+    }
+
+    return trx
+  }
+  private buildAdminWhere(query: AdminHistoryQueryDto) {
+    const where: any = {}
+
+    if (query.status) where.status = query.status
+    if (query.method) where.paymentMethod = query.method
+    if (query.userId) where.userId = query.userId
+    if (query.search) {
+      where.OR = [
+        { id: { contains: query.search } },
+        { orderNumber: { contains: query.search, mode: 'insensitive' } },
+      ]
+    }
+    if (query.startDate) where.createdAt = { ...where.createdAt, gte: new Date(query.startDate) }
+    if (query.endDate) where.createdAt = { ...where.createdAt, lte: new Date(query.endDate) }
+
+    return where
+  }
+
+  async getAdminHistory(query: AdminHistoryQueryDto) {
+    const { page = 1, limit = 20 } = query
+    const skip = (page - 1) * limit
+
+    const where = this.buildAdminWhere(query)
+
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        skip,
+        take: limit,
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          createdBy: { select: { id: true, name: true, email: true } },
+          payment: { select: { method: true, invoiceNumber: true } },
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.transaction.count({ where }),
+    ])
+
+    return {
+      data: data.map(TransactionMapper.toAdminHistoryDto),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }
+  }
+
+  async getUserHistory(userId: string, query: UserHistoryQueryDto) {
+    const { page = 1, limit = 10 } = query
+    const skip = (page - 1) * limit
+
+    const where: any = { createdById: userId }
+
+    if (query.search) {
+      where.OR = [
+        { id: { contains: query.search } },
+        { orderNumber: { contains: query.search } },
+      ]
+    }
+    if (query.startDate) where.createdAt = { ...where.createdAt, gte: new Date(query.startDate) }
+    if (query.endDate) where.createdAt = { ...where.createdAt, lte: new Date(query.endDate) }
+
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        skip,
+        take: limit,
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          payment: { select: { method: true } },
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.transaction.count({ where }),
+    ])
+
+    return {
+      data: data.map(TransactionMapper.toHistoryDto),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }
+  }
+
+  async getHistory(user: any, query: AdminHistoryQueryDto) {
+    const isAdmin = user.role === UserRole.ADMIN
+    return isAdmin
+      ? this.getAdminHistory(query)
+      : this.getUserHistory(user.id, query)
+  }
 
 }

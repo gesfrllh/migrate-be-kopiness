@@ -1,3 +1,5 @@
+import { UserRole } from '@prisma/client'
+
 export type PaymentMethod = 'CASH' | 'QRIS' | 'TRANSFER' | 'DEBIT'
 export type roastLevel = 'LIGHT' | 'MEDIUM' | 'DARK'
 export type strengh = 'LIGHT' | 'NORMAL' | 'STRONG'
@@ -81,4 +83,10 @@ export enum SyrupType {
 export interface SelectOptions {
   label: string;
   value: string;
+}
+
+export interface JwtPayload {
+  sub: string
+  email: string
+  role: UserRole
 }
