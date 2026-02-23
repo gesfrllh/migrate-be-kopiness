@@ -327,7 +327,13 @@ export class TransactionService {
     const where: any = {}
 
     if (query.status) where.status = query.status
-    if (query.method) where.paymentMethod = query.method
+    if (query.method) {
+      where.payment = {
+        is: {
+          method: query.method
+        }
+      }
+    }
     if (query.userId) where.userId = query.userId
     if (query.search) {
       where.OR = [

@@ -8,19 +8,37 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import passport from 'passport';
+
 const server = express();
 let initialized = false;
 
 async function bootstrap() {
   if (initialized) return;
 
-
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(server),
   );
 
-  app.use(cookieParser())
+  app.use(cookieParser());
+
+  // Session & Passport Middleware
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'kopiness-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: false,
+      httpOnly: true,
+    }
+  }));
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
   app.setGlobalPrefix('api');
 
   // Swagger

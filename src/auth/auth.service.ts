@@ -5,6 +5,7 @@ import * as jwt from 'jsonwebtoken';
 import { RegisterDto } from './dto/register.dto';
 import { GoogleUser, UserResponseDto } from '../common/types/auth';
 import { User } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class AuthService {
@@ -115,6 +116,64 @@ export class AuthService {
     return {
       token,
       user: safe,
+    }
+  }
+
+  async requestResetPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email }
+    })
+
+    if (!user) {
+      throw new BadRequestException('Email not registered')
+    }
+
+    const token = randomBytes(32).toString('hex');
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        token,
+        email,
+        expiresAt
+      }
+    })
+
+    const resetLink = `http://localhost:3000/forgot-password/reset?token=${token}`
+
+    return {
+      message: 'Reset password link generated',
+      resetLink
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token }
+    })
+
+    if (!resetToken) {
+      throw new BadRequestException('Invalid reset token')
+    }
+
+    if (resetToken.expiresAt < new Date()) {
+      throw new BadRequestException('Reset token expired')
+    }
+
+    const hashedPassword = await argon2.hash(newPassword);
+
+    await this.prisma.user.update({
+      where: { email: resetToken.email },
+      data: { password: hashedPassword }
+    })
+
+    await this.prisma.passwordResetToken.delete({
+      where: { token }
+    })
+
+    return {
+      message: 'Password successfuly reset'
     }
   }
 

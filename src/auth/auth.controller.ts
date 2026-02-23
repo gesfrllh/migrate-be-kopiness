@@ -100,4 +100,17 @@ export class AuthController {
       }
     }
   }
+
+  @Post('forgot-password')
+  forgot(@Body('email') email: string) {
+    return this.authService.requestResetPassword(email)
+  }
+
+  @Post('reset-password')
+  reset(
+    @Body('token') token: string,
+    @Body('password') password: string
+  ) {
+    return this.authService.resetPassword(token, password)
+  }
 }

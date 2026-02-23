@@ -6,6 +6,7 @@ import { TransactionModule } from './modules/transaction/transaction.module';
 import { FileModule } from './file/file.module';
 import { AiModule } from './modules/ai/ai.module';
 import { CoffeeAssistantModule } from './modules/coffe/coffe.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CoffeeAssistantModule } from './modules/coffe/coffe.module';
     TransactionModule,
     FileModule,
     AiModule,
+    DashboardModule,
     CoffeeAssistantModule,
   ],
 })
