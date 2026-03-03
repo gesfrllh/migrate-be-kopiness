@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { PaymentMethod, Transaction, TransactionStatus, UserRole } from "@prisma/client";
-import { mapToCashierDto } from "./dto/cashier-transaction.mapper";
+import { mapToCashierDto } from "./mapper/cashier-transaction.mapper";
 import { CashierTransactionDto } from "./dto/cashier-transaction.dto";
 import { formatOrderNumber, generateInvoiceNumber } from "src/common/utils/general";
 import { PayTransactionsDto } from "./dto/cashier-payment.dto";
@@ -10,6 +10,9 @@ import { PaymentService } from "../payment/payment.service";
 import { AdminHistoryQueryDto } from "./dto/admin-history-query.dto";
 import { UserHistoryQueryDto } from "./dto/user-history-query.dto";
 import { TransactionMapper } from "./dto/transaction.mapper";
+import { TransactionTrackingResponseDto } from "./tracking-dto/response.dto";
+import { mapLogsToTracking } from "./mapper/transaction-tracking.mapper";
+import { buildOrderTracking } from "./mapper/transaction-tracking.enriched.mapper";
 
 @Injectable()
 export class TransactionService {
@@ -424,6 +427,43 @@ export class TransactionService {
     return isAdmin
       ? this.getAdminHistory(query)
       : this.getUserHistory(user.id, query)
+  }
+
+  async getTracking(id: string): Promise<TransactionTrackingResponseDto> {
+    const trx = await this.prisma.transaction.findUnique({
+      where: { id },
+      select: {
+        orderNumber: true,
+        status: true,
+        transactionLogs: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            action: true,
+            meta: true,
+            createdAt: true,
+            message: true
+          }
+        }
+      }
+
+
+    })
+
+    if (!trx) {
+      throw new NotFoundException('Transaction Not Found')
+    }
+
+    const timeline = mapLogsToTracking(trx.transactionLogs)
+
+    const { steps, progressPercent } = buildOrderTracking(timeline)
+
+    return {
+      orderNumber: trx.orderNumber as string,
+      status: trx.status,
+      progressPercent,
+      timeline,
+      steps
+    }
   }
 
 }

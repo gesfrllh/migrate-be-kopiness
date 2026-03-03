@@ -8,6 +8,9 @@ type UserHistoryPayload = Prisma.TransactionGetPayload<{
     _count: {
       select: { items: true }
     }
+    trasanctionLogs: {
+      select: { items: true }
+    }
   }
 }>
 
@@ -20,6 +23,9 @@ type AdminHistoryPayload = Prisma.TransactionGetPayload<{
       select: { method: true, invoiceNumber: true }
     },
     _count: {
+      select: { items: true }
+    },
+    trasanctionLogs: {
       select: { items: true }
     }
   }
@@ -35,7 +41,8 @@ export class TransactionMapper {
       orderNumber: trx.orderNumber,
       paymentMethod: trx.payment?.method ?? null,
       itemCount: trx._count.items,
-      createdAt: trx.createdAt
+      createdAt: trx.createdAt,
+      transactionLog: trx.trasanctionLogs
     }
   }
 
@@ -48,6 +55,7 @@ export class TransactionMapper {
       createdAt: trx.createdAt,
       orderNumber: trx.orderNumber,
       paymentMethod: trx.payment?.method ?? null,
+      transactionLog: trx.trasanctionLogs,
       itemCount: trx._count.items,
       customer: trx.createdBy ? {
         id: trx.createdBy.id,
