@@ -78,19 +78,19 @@ export class DashboardService {
         revenue: number
       }[]
     >`
-SELECT 
-  p.id as "productId",
-  p.name,
-  SUM(ti.quantity)::int as "qty",
-  SUM(ti.quantity * ti.price)::int as "revenue"
-FROM "TransactionItem" ti
-JOIN "Transaction" t ON t.id = ti."transactionId"
-JOIN "Product" p ON p.id = ti."productId"
-WHERE t.status = 'PAID'
-GROUP BY p.id, p.name
-ORDER BY "qty" DESC
-LIMIT 5
-`
+      SELECT 
+        p.id as "productId",
+        p.name,
+        SUM(ti.quantity)::int as "qty",
+        SUM(ti.quantity * ti.price)::int as "revenue"
+      FROM "TransactionItem" ti
+      JOIN "Transaction" t ON t.id = ti."transactionId"
+      JOIN "Product" p ON p.id = ti."productId"
+      WHERE t.status = 'PAID'
+      GROUP BY p.id, p.name
+      ORDER BY "qty" DESC
+      LIMIT 5
+      `
 
     return {
       stats: {

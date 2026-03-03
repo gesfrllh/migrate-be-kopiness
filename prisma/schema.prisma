@@ -72,8 +72,9 @@ model Transaction {
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
 
-  paymentId String?
-  payment   Payment? @relation(fields: [paymentId], references: [id])
+  paymentId       String?
+  payment         Payment?         @relation(fields: [paymentId], references: [id])
+  transactionLogs TransactionLog[]
 
   @@index([status, createdAt]) // ✅ PENTING: Index untuk getCashierQueue
   @@index([createdById]) // ✅ Index untuk query by user
@@ -131,4 +132,29 @@ model PasswordResetToken {
   email     String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model TransactionLog {
+  id            String            @id @default(uuid())
+  transactionId String
+  action        TransactionAction
+  message       String?
+  meta          Json?
+  createdAt     DateTime          @default(now())
+  transaction   Transaction       @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum TransactionAction {
+  CREATED
+  ITEM_ADD
+  PAYMENT_STARTED
+  PAID
+  PAYMENT_FAILED
+  CANCELLED
+  STOCK_DEDUCTED
+  REFUNDED
 }

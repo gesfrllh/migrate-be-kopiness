@@ -30,6 +30,7 @@ import { AdminSummaryResponseDto } from './dto/admin-summary-response.dto'
 import { Roles } from 'src/common/decorators/roles.decorator'
 import { UserRole } from '@prisma/client'
 import { RolesGuard } from 'src/common/guards/roles.guard'
+import { TransactionTrackingResponseDto } from './tracking-dto/response.dto'
 
 @ApiTags('Transaction')
 @ApiBearerAuth()
@@ -130,6 +131,17 @@ export class TransactionController {
   @ApiParam({ name: 'id', type: String })
   getDetail(@Param('id') id: string) {
     return this.transactionService.getDetail(id)
+  }
+
+  @Get(':id/tracking')
+  @UseGuards(JwtGuard)
+  @ApiParam({ name: 'id', description: 'Transaction ID' })
+  @ApiOkResponse({
+    description: 'Order Tracking timeline',
+    type: TransactionTrackingResponseDto
+  })
+  getTracking(@Param('id') id: string) {
+    return this.transactionService.getTracking(id)
   }
 }
 
