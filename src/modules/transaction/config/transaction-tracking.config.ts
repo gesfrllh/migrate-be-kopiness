@@ -21,7 +21,7 @@ export const TRANSACTION_ACTION_CONFIG: Record<
       meta?.method ? `Metode Pemabayaran: ${meta.method}` : '-'
   },
   STOCK_DEDUCTED: {
-    step: 99, // internal
+    step: 99, // 
     label: 'Stok diproses',
     visible: false,
   },
