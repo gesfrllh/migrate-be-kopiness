@@ -43,9 +43,11 @@ export class AuthController {
 
     const encryptedToken = encryptToken(token)
 
+    const isProduction = process.env.NODE_ENV === 'production'
+
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: false, // true di prod
+      secure: isProduction,
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -76,9 +78,11 @@ export class AuthController {
 
     const encryptedToken = encryptToken(token)
 
+    const isProduction = process.env.NODE_ENV === 'production'
+
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: false, // true di prod
+      secure: isProduction,
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,

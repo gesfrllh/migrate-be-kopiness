@@ -82,7 +82,7 @@ export class DashboardService {
         p.id as "productId",
         p.name,
         SUM(ti.quantity)::int as "qty",
-        SUM(ti.quantity * ti.price)::int as "revenue"
+        SUM(ti.quantity * COALESCE(ti.price, p.price))::int as "revenue"
       FROM "TransactionItem" ti
       JOIN "Transaction" t ON t.id = ti."transactionId"
       JOIN "Product" p ON p.id = ti."productId"

@@ -94,8 +94,9 @@ export class TransactionController {
   @ApiOkResponse({
     description: 'Transaction cancelled',
   })
-  cancel(@Param('id') id: string) {
-    return this.transactionService.cancel(id)
+  cancel(@Param('id') id: string, @Req() req: express.Request) {
+    if (!req.user) throw new UnauthorizedException()
+    return this.transactionService.cancel(id, req.user.id)
   }
 
   @Post('history')

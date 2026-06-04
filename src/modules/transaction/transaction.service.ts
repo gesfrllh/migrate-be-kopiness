@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { PaymentMethod, Transaction, TransactionStatus, UserRole } from "@prisma/client";
@@ -75,14 +75,14 @@ export class TransactionService {
         data: dto.items.map(item => ({
           transactionId: created.id,
           productId: item.productId,
-          quantity: item.quantity
+          quantity: item.quantity,
+          price: productMap.get(item.productId)!.price || 0,
         }))
       })
 
       return created.id
     })
 
-    // ✅ Query final result di luar transaction
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
       select: {
@@ -166,11 +166,15 @@ export class TransactionService {
     return trx
   }
 
-  async cancel(id: string) {
+  async cancel(id: string, userId: string) {
     const trx = await this.getById(id)
 
     if (trx.status !== TransactionStatus.PENDING) {
       throw new BadRequestException('Transaction Cannot be cancelled')
+    }
+
+    if (trx.createdById !== userId) {
+      throw new ForbiddenException('You do not own this transaction')
     }
 
     return this.prisma.transaction.update({
@@ -299,33 +303,98 @@ export class TransactionService {
   }
 
   async getDetail(id: string) {
-    const trx = this.prisma.transaction.findUnique({
+    // const trx = this.prisma.transaction.findUnique({
+    //   where: { id },
+    //   include: {
+    //     createdBy:
+    //     {
+    //       select:
+    //       {
+    //         id: true,
+    //         name: true,
+    //         email: true
+    //       }
+    //     },
+    //     payment: true,
+    //     items: {
+    //       include: {
+    //         product: true
+    //       }
+    //     }
+    //   }
+    // })
+
+    // if (!trx) {
+    //   throw new NotFoundException('Transaction not found')
+    // }
+
+    // return trx
+
+    const trx = await this.prisma.transaction.findUnique({
       where: { id },
       include: {
-        createdBy:
-        {
-          select:
-          {
+        createdBy: {
+          select: {
             id: true,
             name: true,
             email: true
-          }
+          },
         },
+
         payment: true,
+
         items: {
           include: {
             product: true
+          }
+        },
+
+        transactionLogs: {
+          orderBy: {
+            createdAt: 'asc'
+          },
+
+          select: {
+            action: true,
+            meta: true,
+            createdAt: true,
+            message: true,
           }
         }
       }
     })
 
     if (!trx) {
-      throw new NotFoundException('Transaction not found')
+      throw new NotFoundException(
+        'Transaction not found'
+      )
     }
 
-    return trx
+    const timeline = mapLogsToTracking(
+      trx.transactionLogs
+    )
+
+    const { steps, progressPercent } = buildOrderTracking(timeline)
+
+    return {
+      id: trx.id,
+      orderNumber: trx.orderNumber,
+      status: trx.status,
+      total: trx.total,
+      createAt: trx.createdAt,
+      paymentId: trx.paymentId,
+      createdBy: trx.createdBy,
+      payment: trx.payment,
+      items: trx.items,
+      tracking: {
+        timeline,
+        steps,
+        progressPercent
+      }
+    }
   }
+
+
   private buildAdminWhere(query: AdminHistoryQueryDto) {
     const where: any = {}
 

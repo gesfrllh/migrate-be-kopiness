@@ -2,6 +2,20 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { supabase } from '../lib/supabase';
 import { randomUUID } from 'crypto';
 
+const IMAGE_MAGIC_BYTES: Record<string, number[][]> = {
+  'image/jpeg': [[0xFF, 0xD8, 0xFF]],
+  'image/png': [[0x89, 0x50, 0x4E, 0x47]],
+  'image/webp': [[0x52, 0x49, 0x46, 0x46]],
+};
+
+function verifyImageMagicBytes(buffer: Buffer, mimetype: string): boolean {
+  const signatures = IMAGE_MAGIC_BYTES[mimetype];
+  if (!signatures) return false;
+  return signatures.some((bytes) =>
+    bytes.every((byte, i) => buffer[i] === byte),
+  );
+}
+
 @Injectable()
 export class FileService {
   async uploadToSupabase(file: Express.Multer.File) {
@@ -9,9 +23,8 @@ export class FileService {
       throw new BadRequestException('File is required');
     }
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Invalid file type');
+    if (!verifyImageMagicBytes(file.buffer, file.mimetype)) {
+      throw new BadRequestException('Invalid or corrupted image file');
     }
 
     const ext = file.originalname.split('.').pop();
