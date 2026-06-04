@@ -11,48 +11,42 @@ export class AiService {
   }
 
   async adjustCoffee(dto: CoffeeAssistantDto) {
-    const prompt = `
-Kamu adalah barista profesional dengan pengalaman 10+ tahun.
-Analisa hasil seduhan user dan berikan perbaikan yang presisi.
+    const prompt = `You are a world-class coffee expert with 15+ years of specialty coffee experience.
 
-Kondisi saat ini:
+Analyze the user's brewing setup and provide extremely specific, actionable adjustments.
 
-Minuman: ${dto.method}
-Tipe: ${dto.drinkType ?? 'tidak disebutkan'}
-Roast Level: ${dto.roastLevel}
-Strength Preference: ${dto.tastePreference}
-Milk: ${dto.milkType ?? 'tanpa susu'}
-Syrup: ${dto.syrupType ?? 'tanpa syrup'}
-strength: ${dto.strength}
-ratio: 1:${dto.ratio} 
-Iced: ${dto.ice ? 'Ya (menggunakan es)' : 'Tidak'}
-Problem yang dirasakan: ${dto.problem}
+## USER'S CURRENT SETUP
+- Brew Method: ${dto.method}
+- Drink Type: ${dto.drinkType ?? 'not specified'}
+- Roast Level: ${dto.roastLevel}
+- Taste Preference: ${dto.tastePreference}
+- Milk: ${dto.milkType ?? 'none'}
+- Syrup: ${dto.syrupType ?? 'none'}
+- Strength: ${dto.strength}
+- Coffee-to-Water Ratio: 1:${dto.ratio}
+- Iced: ${dto.ice ? 'Yes' : 'No'}
+- Reported Problem: ${dto.problem}
 
-Jika minuman berbasis susu, pertimbangkan juga:
-- suhu susu
-- tekstur foam
-- keseimbangan kopi dan susu
+## RESPONSE RULES
+1. Return ONLY valid JSON — no markdown, no explanations, no code blocks.
+2. Every adjustment must be specific (numbers, grams, seconds, temperatures).
+3. Never give generic advice like "kurangi kopi" or "tambah air" — be precise.
 
-Jika iced, pertimbangkan efek dilution dari es.
-
-Berikan jawaban HANYA dalam format JSON valid berikut:
-
+## REQUIRED JSON FORMAT
 {
-  "analysis": string,
-  "rootCause": string,
-  "adjustment": string[],
-  "newRatio": string,
-  "grindSize": string,
-  "temperature": string,
-  "milkAdjustment": string | null,
-  "confidence": number (0-100)
-}
-
-Rules:
-- Jangan beri penjelasan di luar JSON.
-- Jangan gunakan markdown.
-- Jawaban harus valid JSON.
-`
+  "analysis": "Brief 2-3 sentence diagnosis in Indonesian",
+  "rootCause": "Single specific root cause in Indonesian",
+  "adjustment": [
+    "Specific adjustment 1 (e.g., Turunkan dosis kopi dari 18g ke 16g)",
+    "Specific adjustment 2 (e.g., Giling lebih kasar ke setting 22 pada Comandante)",
+    "Specific adjustment 3 (e.g., Kurangi suhu air dari 96°C ke 92°C)"
+  ],
+  "newRatio": "Specific ratio like 1:16.5",
+  "grindSize": "Specific grind setting with reference (e.g., Setting 20 pada Comandante)",
+  "temperature": "Exact temperature in °C (e.g., 92°C)",
+  "milkAdjustment": "Specific milk advice or null if no milk",
+  "confidence": number between 0-100
+}`
 
     try {
       const response = await this.groq.chat.completions.create({
