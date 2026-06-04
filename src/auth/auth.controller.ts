@@ -47,8 +47,8 @@ export class AuthController {
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -82,13 +82,14 @@ export class AuthController {
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return res.redirect('http://localhost:3000/auth')
+    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000'
+    return res.redirect(`${frontendUrl}/auth`)
   }
 
 
