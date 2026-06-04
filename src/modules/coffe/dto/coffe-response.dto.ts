@@ -1,4 +1,3 @@
-// src/modules/coffee-assistant/dto/coffe-response.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 
 export class BrewStepDto {
@@ -7,6 +6,20 @@ export class BrewStepDto {
 
   @ApiProperty()
   detail: string;
+}
+
+export class ProblemContextDto {
+  @ApiProperty()
+  key: string;
+
+  @ApiProperty()
+  label: string;
+
+  @ApiProperty()
+  description: string;
+
+  @ApiProperty({ enum: ['RENDAH', 'SEDANG', 'TINGGI'] })
+  severity: 'RENDAH' | 'SEDANG' | 'TINGGI';
 }
 
 export class CoffeeGuideDto {
@@ -36,4 +49,7 @@ export class CoffeeGuideDto {
 
   @ApiProperty({ required: false })
   foamDensity?: 'THIN' | 'MEDIUM' | 'THICK';
+
+  @ApiProperty({ type: [ProblemContextDto], required: false })
+  potentialProblems?: ProblemContextDto[];
 }

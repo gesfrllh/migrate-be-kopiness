@@ -28,6 +28,7 @@ export class CoffeeAssistantController {
       milkVolume: guide.milkVolume,
       milkTemp: guide.milkTemp,
       foamDensity: guide.foamDensity,
+      potentialProblems: guide.potentialProblems,
     };
   }
 
