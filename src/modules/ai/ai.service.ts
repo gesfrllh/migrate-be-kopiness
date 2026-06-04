@@ -1,16 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import Groq from "groq-sdk";
 import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
 
 @Injectable()
 export class AiService {
-  private groq: Groq;
-
-  constructor() {
-    this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  }
+  private ai: any = null;
 
   async adjustCoffee(dto: CoffeeAssistantDto) {
+    if (!this.ai) {
+      const { GoogleGenAI } = await import("@google/genai");
+      this.ai = new GoogleGenAI({ apiKey: process.env.GOOGLEAI_KEY });
+    }
+
     const prompt = `You are a world-class coffee expert with 15+ years of specialty coffee experience.
 
 Analyze the user's brewing setup and provide extremely specific, actionable adjustments.
@@ -46,29 +46,27 @@ Analyze the user's brewing setup and provide extremely specific, actionable adju
   "temperature": "Exact temperature in °C (e.g., 92°C)",
   "milkAdjustment": "Specific milk advice or null if no milk",
   "confidence": number between 0-100
-}`
+}`;
 
     try {
-      const response = await this.groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
+      const response = await this.ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
       });
 
-      const rawText = response.choices[0]?.message?.content || '';
+      const rawText = response.text;
 
       const cleaned = rawText
-        ?.replace(/```json/g, '')
-        ?.replace(/```/g, '')
+        ?.replace(/```json/g, "")
+        ?.replace(/```/g, "")
         ?.trim();
 
-      const parsed = JSON.parse(cleaned || '{}');
+      const parsed = JSON.parse(cleaned || "{}");
 
       return parsed;
     } catch (err) {
       console.error(err);
-      throw new Error('Adjustment failed');
+      throw new Error("Adjustment failed");
     }
   }
-
 }
