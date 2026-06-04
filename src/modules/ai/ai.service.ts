@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
 
 @Injectable()
 export class AiService {
-  private genAI: GoogleGenerativeAI;
+  private groq: Groq;
 
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GOOGLEAI_KEY!);
+    this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   }
 
   async adjustCoffee(dto: CoffeeAssistantDto) {
@@ -55,9 +55,13 @@ Rules:
 `
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      const result = await model.generateContent(prompt);
-      const rawText = result.response.text();
+      const response = await this.groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+      });
+
+      const rawText = response.choices[0]?.message?.content || '';
 
       const cleaned = rawText
         ?.replace(/```json/g, '')
