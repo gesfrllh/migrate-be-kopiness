@@ -1,16 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "npx prisma generate && npx nest build",
-  "builds": [
+  "rewrites": [
     {
-      "src": "dist/src/main.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "dist/src/main.js"
+      "source": "/(.*)",
+      "destination": "/api/index"
     }
   ]
 }
