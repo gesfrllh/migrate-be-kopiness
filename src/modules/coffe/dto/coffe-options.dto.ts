@@ -2,28 +2,28 @@ import { ApiProperty } from '@nestjs/swagger';
 
 class SelectOptionDto {
   @ApiProperty()
-  label: string;
+  label: string | undefined;
 
   @ApiProperty()
-  value: string;
+  value: string | undefined;
 }
 
 export class CoffeeAssistantOptionsDto {
   @ApiProperty({ type: [SelectOptionDto] })
-  roastLevels: SelectOptionDto[];
+  roastLevels: SelectOptionDto[] = [];
 
   @ApiProperty({ type: [SelectOptionDto] })
-  strength: SelectOptionDto[];
+  strength: SelectOptionDto[] = [];
 
   @ApiProperty({ type: [SelectOptionDto] })
-  drinkTypes: SelectOptionDto[];
+  drinkTypes: SelectOptionDto[] = [];
 
   @ApiProperty({ type: [SelectOptionDto] })
-  drinkNames: SelectOptionDto[];
+  drinkNames: SelectOptionDto[] = [];
 
   @ApiProperty({ type: [SelectOptionDto] })
-  milkTypes: SelectOptionDto[];
+  milkTypes: SelectOptionDto[] = [];
 
   @ApiProperty({ type: [SelectOptionDto] })
-  syrupTypes: SelectOptionDto[];
+  syrupTypes: SelectOptionDto[] = [];
 }
