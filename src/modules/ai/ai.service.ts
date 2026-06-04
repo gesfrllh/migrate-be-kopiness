@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
 
 @Injectable()
 export class AiService {
-  private ai = new GoogleGenAI({
-    apiKey: process.env.GOOGLEAI_KEY
-  });
+  private genAI: GoogleGenerativeAI;
+
+  constructor() {
+    this.genAI = new GoogleGenerativeAI(process.env.GOOGLEAI_KEY!);
+  }
 
   async adjustCoffee(dto: CoffeeAssistantDto) {
     const prompt = `
@@ -52,13 +54,10 @@ Rules:
 - Jawaban harus valid JSON.
 `
 
-
     try {
-      const response = await this.ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt
-      });
-      const rawText = response.text;
+      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(prompt);
+      const rawText = result.response.text();
 
       const cleaned = rawText
         ?.replace(/```json/g, '')
