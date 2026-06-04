@@ -134,6 +134,17 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 }
 
+model Session {
+  id        String   @id
+  sid       String   @unique
+  data      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
 model TransactionLog {
   id            String            @id @default(uuid())
   transactionId String

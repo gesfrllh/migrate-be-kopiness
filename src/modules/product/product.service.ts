@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Req } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
@@ -76,8 +76,12 @@ export class ProductService {
     return product;
   }
 
-  async update(id: string, dto: UpdateProductDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateProductDto, userId: string) {
+    const product = await this.findOne(id);
+
+    if (product.createdBy.id !== userId) {
+      throw new ForbiddenException('You do not own this product');
+    }
 
     return this.prisma.product.update({
       where: { id },
@@ -85,8 +89,12 @@ export class ProductService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, userId: string) {
+    const product = await this.findOne(id);
+
+    if (product.createdBy.id !== userId) {
+      throw new ForbiddenException('You do not own this product');
+    }
 
     return this.prisma.product.delete({
       where: { id },

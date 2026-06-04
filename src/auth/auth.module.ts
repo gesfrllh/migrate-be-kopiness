@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
 import JwtBlacklistGuard from '../common/guards/jwt-blacklist.guard';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import googleOauthConfig from './config/google-oauth.config';
 import { GoogleStrategy } from './strategies/google.stragety';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -13,9 +13,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     PrismaModule,
     ConfigModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '1d' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '1d' },
+      }),
     }),
     ConfigModule.forFeature(googleOauthConfig)
   ],

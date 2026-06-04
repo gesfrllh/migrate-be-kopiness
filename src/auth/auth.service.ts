@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -44,17 +44,19 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user || !user.password) {
-      throw new BadRequestException('This Account uses google sign in')
+      throw new BadRequestException('Invalid credentials')
     }
 
-    if (!user) throw new Error('Invalid credentials');
+    const valid = await argon2.verify(user.password, password);
+    if (!valid) throw new BadRequestException('Invalid credentials');
 
-    const valid = await argon2.verify(user.password as string, password);
-    if (!valid) throw new Error('Invalid credentials');
-
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new InternalServerErrorException('JWT_SECRET is not configured');
+    }
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email },
-      process.env.JWT_SECRET || 'SECRET',
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
@@ -100,6 +102,10 @@ export class AuthService {
       })
     }
 
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new InternalServerErrorException('JWT_SECRET is not configured');
+    }
     const token = jwt.sign(
       {
         id: user.id,
@@ -107,7 +113,7 @@ export class AuthService {
         email: user.email,
         provider: 'google',
       },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       { expiresIn: '7d' },
     )
 
@@ -140,7 +146,8 @@ export class AuthService {
       }
     })
 
-    const resetLink = `http://localhost:3000/forgot-password/reset?token=${token}`
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+    const resetLink = `${frontendUrl}/forgot-password/reset?token=${token}`
 
     return {
       message: 'Reset password link generated',

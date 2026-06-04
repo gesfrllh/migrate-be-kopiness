@@ -69,13 +69,13 @@ export class ProductController {
 
   @Patch(':id')
   @UseGuards(JwtGuard)
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.productService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto, @Req() req: any) {
+    return this.productService.update(id, dto, req.user.id);
   }
 
   @Delete(':id')
   @UseGuards(JwtGuard)
-  remove(@Param('id') id: string) {
-    return this.productService.remove(id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.productService.remove(id, req.user.id);
   }
 }

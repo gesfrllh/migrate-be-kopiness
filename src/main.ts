@@ -10,6 +10,9 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
+import helmet from 'helmet';
+import { PrismaSessionStore } from './prisma/session-store';
+import { PrismaClient } from '@prisma/client';
 
 const server = express();
 let initialized = false;
@@ -22,16 +25,25 @@ async function bootstrap() {
     new ExpressAdapter(server),
   );
 
+  // Security headers
+  app.use(helmet());
+
   app.use(cookieParser());
 
   // Session & Passport Middleware
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET environment variable is required');
+  }
+
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'kopiness-secret-key',
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    store: new PrismaSessionStore(new PrismaClient()),
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
     }
   }));
@@ -41,23 +53,26 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // Swagger
-  const config = new DocumentBuilder()
-    .setTitle('Kopiness Migration API')
-    .setDescription('The Kopiness Migration API description')
-    .setVersion('1.0')
-    .build();
+  // Swagger — disable in production
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Kopiness Migration API')
+      .setDescription('The Kopiness Migration API description')
+      .setVersion('1.0')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document);
+  }
 
   app.useGlobalInterceptors(
     new ResponseInterceptor()
   )
 
   // Enable CORS
+  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'PUT', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -69,9 +84,11 @@ async function bootstrap() {
   await app.init();
   initialized = true;
 
-  const PORT = process.env.PORT || 3001;
-  await app.listen(PORT);
-  console.log(`🚀 Server running on http://localhost:${PORT}/api`);
+  if (process.env.VERCEL !== '1') {
+    const PORT = process.env.PORT || 3001;
+    await app.listen(PORT);
+    console.log(`Server running on http://localhost:${PORT}/api`);
+  }
 
 }
 
