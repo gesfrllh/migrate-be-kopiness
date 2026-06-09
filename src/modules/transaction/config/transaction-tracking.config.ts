@@ -56,4 +56,14 @@ export const TRANSACTION_ACTION_CONFIG: Record<
     visible: true,
     description: (meta) => meta?.reason ?? 'Pembayaran gagal',
   },
+  IN_PROGRESS: {
+    step: 4,
+    label: 'Pesanan Diproses',
+    visible: true,
+  },
+  DELIVERED: {
+    step: 5,
+    label: 'Pesanan Selesai',
+    visible: true,
+  },
 }

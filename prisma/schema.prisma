@@ -16,6 +16,31 @@ model User {
 
   products     Product[]
   transactions Transaction[]
+  stores       Store[]        @relation("StoreOwner")
+  cart         Cart?
+}
+
+model Store {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  address     String?
+  phone       String?
+  logoUrl     String?
+  latitude    Float?
+  longitude   Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User   @relation("StoreOwner", fields: [ownerId], references: [id])
+  ownerId     String
+  products    Product[]
+  transactions Transaction[]
+
+  @@index([ownerId])
+  @@index([slug])
 }
 
 model Product {
@@ -31,17 +56,47 @@ model Product {
   imageUrl    String[]
   createdBy   User              @relation(fields: [createdById], references: [id])
   createdById String
+  store       Store?            @relation(fields: [storeId], references: [id])
+  storeId     String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   items       TransactionItem[]
+  cartItems   CartItem[]
 
-  @@index([createdById]) // ✅ Index untuk query by creator
+  @@index([createdById])
+  @@index([storeId])
 }
 
 enum RoastLevel {
   LIGHT
   MEDIUM
   DARK
+}
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  productId String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
 }
 
 model TransactionItem {
@@ -71,24 +126,30 @@ model Transaction {
 
   createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
+  storeId     String?
 
+  store     Store?         @relation(fields: [storeId], references: [id])
   paymentId       String?
   payment         Payment?         @relation(fields: [paymentId], references: [id])
   transactionLogs TransactionLog[]
 
-  @@index([status, createdAt]) // ✅ PENTING: Index untuk getCashierQueue
-  @@index([createdById]) // ✅ Index untuk query by user
-  @@index([paymentId]) // ✅ Index untuk query by payment
+  @@index([status, createdAt])
+  @@index([createdById])
+  @@index([paymentId])
+  @@index([storeId])
 }
 
 enum TransactionStatus {
-  PAID
   PENDING
+  PAID
+  IN_PROGRESS
+  DELIVERED
   CANCELLED
 }
 
 enum UserRole {
-  ADMIN
+  SUPERADMIN
+  STOREOWNER
   CUSTOMER
 }
 
@@ -168,4 +229,6 @@ enum TransactionAction {
   CANCELLED
   STOCK_DEDUCTED
   REFUNDED
+  IN_PROGRESS
+  DELIVERED
 }

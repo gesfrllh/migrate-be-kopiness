@@ -77,6 +77,14 @@ export class CreateProductDto {
     description: 'Daftar URL gambar produk',
     type: [String],
   })
+  @ApiPropertyOptional({
+    example: 'uuid-store-id',
+    description: 'Store ID (auto-assigned if not provided for STOREOWNER)',
+  })
+  @IsOptional()
+  @IsString()
+  storeId?: string;
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

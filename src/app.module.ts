@@ -9,6 +9,8 @@ import { FileModule } from './file/file.module';
 import { AiModule } from './modules/ai/ai.module';
 import { CoffeeAssistantModule } from './modules/coffe/coffe.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { StoreModule } from './modules/store/store.module';
+import { CartModule } from './modules/cart/cart.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AiModule,
     DashboardModule,
     CoffeeAssistantModule,
+    StoreModule,
+    CartModule,
   ],
   providers: [
     {

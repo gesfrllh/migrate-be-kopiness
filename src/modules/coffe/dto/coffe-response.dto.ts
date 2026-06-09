@@ -2,29 +2,29 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class BrewStepDto {
   @ApiProperty()
-  step: string;
+  step!: string;
 
   @ApiProperty()
-  detail: string;
+  detail!: string;
 }
 
 export class ProblemContextDto {
   @ApiProperty()
-  key: string;
+  key!: string;
 
   @ApiProperty()
-  label: string;
+  label!: string;
 
   @ApiProperty()
-  description: string;
+  description!: string;
 
   @ApiProperty({ enum: ['RENDAH', 'SEDANG', 'TINGGI'] })
-  severity: 'RENDAH' | 'SEDANG' | 'TINGGI';
+  severity: 'RENDAH' | 'SEDANG' | 'TINGGI' = "RENDAH";
 }
 
 export class CoffeeGuideDto {
   @ApiProperty({ type: [BrewStepDto] })
-  steps: BrewStepDto[];
+  steps: BrewStepDto[] = [];
 
   @ApiProperty({ required: false })
   ratio?: number;

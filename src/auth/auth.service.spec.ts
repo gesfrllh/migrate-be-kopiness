@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
-import { UserRole } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 
 // Mock Prisma
@@ -44,7 +43,6 @@ describe('AuthService', () => {
         name: 'John',
         email: 'john@example.com',
         password: '123456',
-        role: UserRole.CUSTOMER,
       };
 
       mockPrisma.user.findUnique.mockResolvedValue(null);
@@ -72,7 +70,6 @@ describe('AuthService', () => {
           name: 'John',
           email: 'john@example.com',
           password: '123456',
-          role: UserRole.CUSTOMER,
         }),
       ).rejects.toThrow('Email already exists');
     });
@@ -88,7 +85,7 @@ describe('AuthService', () => {
         name: 'John',
         email: 'john@example.com',
         password: hashedPassword,
-        role: UserRole.CUSTOMER,
+        role: 'CUSTOMER',
       };
 
       mockPrisma.user.findUnique.mockResolvedValue(user);
@@ -118,7 +115,7 @@ describe('AuthService', () => {
         email: 'john@example.com',
         password: await argon2.hash('wrong'),
         name: 'John',
-        role: UserRole.CUSTOMER,
+        role: 'CUSTOMER',
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
 

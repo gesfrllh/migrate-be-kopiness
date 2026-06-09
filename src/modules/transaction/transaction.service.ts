@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
-import { PaymentMethod, Transaction, TransactionStatus, UserRole } from "@prisma/client";
+import { PaymentMethod, Transaction, TransactionAction, TransactionStatus, UserRole } from "@prisma/client";
 import { mapToCashierDto } from "./mapper/cashier-transaction.mapper";
 import { CashierTransactionDto } from "./dto/cashier-transaction.dto";
 import { formatOrderNumber, generateInvoiceNumber } from "src/common/utils/general";
@@ -13,6 +13,7 @@ import { TransactionMapper } from "./dto/transaction.mapper";
 import { TransactionTrackingResponseDto } from "./tracking-dto/response.dto";
 import { mapLogsToTracking } from "./mapper/transaction-tracking.mapper";
 import { buildOrderTracking } from "./mapper/transaction-tracking.enriched.mapper";
+import { UpdateStatusDto } from "./dto/update-status.dto";
 
 @Injectable()
 export class TransactionService {
@@ -29,11 +30,10 @@ export class TransactionService {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const productId = dto.items.map(i => i.productId)
 
-    // ✅ PARALLEL
     const [products, seq] = await Promise.all([
       this.prisma.product.findMany({
         where: { id: { in: productId } },
-        select: { id: true, name: true, price: true, stock: true }
+        select: { id: true, name: true, price: true, stock: true, storeId: true }
       }),
       this.prisma.orderSequence.upsert({
         where: { date: today },
@@ -58,7 +58,9 @@ export class TransactionService {
 
     const orderNumber = formatOrderNumber(today, seq.value)
 
-    // ✅ SPLIT: Buat transaction dulu, items terpisah (LEBIH CEPAT)
+    const firstProduct = products[0]
+    const storeId = firstProduct?.storeId ?? undefined
+
     const transactionId = await this.prisma.$transaction(async (tx) => {
       const created = await tx.transaction.create({
         data: {
@@ -66,11 +68,11 @@ export class TransactionService {
           createdBy: { connect: { id: userId } },
           status: TransactionStatus.PENDING,
           total,
+          ...(storeId ? { store: { connect: { id: storeId } } } : {}),
         },
         select: { id: true }
       })
 
-      // ✅ Batch insert items (1 query untuk semua items)
       await tx.transactionItem.createMany({
         data: dto.items.map(item => ({
           transactionId: created.id,
@@ -80,7 +82,19 @@ export class TransactionService {
         }))
       })
 
+      await tx.transactionLog.create({
+        data: {
+          transactionId: created.id,
+          action: 'CREATED',
+          message: 'Pesanan berhasil dibuat',
+        },
+      })
+
       return created.id
+    })
+
+    await this.prisma.cartItem.deleteMany({
+      where: { cart: { userId } },
     })
 
     const transaction = await this.prisma.transaction.findUnique({
@@ -177,6 +191,14 @@ export class TransactionService {
       throw new ForbiddenException('You do not own this transaction')
     }
 
+    await this.prisma.transactionLog.create({
+      data: {
+        transactionId: id,
+        action: 'CANCELLED',
+        message: 'Pesanan dibatalkan oleh customer',
+      },
+    })
+
     return this.prisma.transaction.update({
       where: { id },
       data: {
@@ -217,7 +239,17 @@ export class TransactionService {
       const invoiceNumber = generateInvoiceNumber()
       const paidAt = new Date()
 
-      // 🔥 Atomic stock update (no manual check)
+      for (const trx of transactions) {
+        await tx.transactionLog.create({
+          data: {
+            transactionId: trx.id,
+            action: 'PAYMENT_STARTED',
+            message: 'Pembayaran dimulai',
+            meta: { method },
+          },
+        })
+      }
+
       await Promise.all(
         transactions.flatMap(trx =>
           trx.items.map(async item => {
@@ -244,6 +276,16 @@ export class TransactionService {
         )
       )
 
+      for (const trx of transactions) {
+        await tx.transactionLog.create({
+          data: {
+            transactionId: trx.id,
+            action: 'STOCK_DEDUCTED',
+            message: 'Stok berhasil dikurangi',
+          },
+        })
+      }
+
       const payment = await tx.payment.create({
         data: {
           invoiceNumber,
@@ -262,6 +304,17 @@ export class TransactionService {
           paymentId: payment.id
         }
       })
+
+      for (const trx of transactions) {
+        await tx.transactionLog.create({
+          data: {
+            transactionId: trx.id,
+            action: 'PAID',
+            message: 'Pembayaran berhasil',
+            meta: { invoiceNumber, method },
+          },
+        })
+      }
 
       return {
         message: 'Payment success',
@@ -492,10 +545,85 @@ export class TransactionService {
   }
 
   async getHistory(user: any, query: AdminHistoryQueryDto) {
-    const isAdmin = user.role === UserRole.ADMIN
+    const isAdmin = user.role === UserRole.SUPERADMIN
     return isAdmin
       ? this.getAdminHistory(query)
       : this.getUserHistory(user.id, query)
+  }
+
+  async getStoreOrders(userId: string, query: { page?: number; limit?: number; status?: string }) {
+    const userStores = await this.prisma.store.findMany({
+      where: { ownerId: userId, isActive: true },
+      select: { id: true },
+    })
+    if (userStores.length === 0) throw new NotFoundException('You have no active stores')
+
+    const storeIds = userStores.map(s => s.id)
+    const page = query.page || 1
+    const limit = query.limit || 20
+    const skip = (page - 1) * limit
+
+    const where: any = { storeId: { in: storeIds } }
+    if (query.status) where.status = query.status
+
+    const [data, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        skip,
+        take: limit,
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          createdBy: { select: { id: true, name: true, email: true } },
+          payment: { select: { method: true, invoiceNumber: true } },
+          items: {
+            include: { product: { select: { id: true, name: true, price: true } } },
+          },
+          store: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.transaction.count({ where }),
+    ])
+
+    return {
+      data,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    }
+  }
+
+  async updateStatus(id: string, userId: string, dto: UpdateStatusDto) {
+    const trx = await this.prisma.transaction.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        storeId: true,
+        store: { select: { ownerId: true } },
+      },
+    })
+
+    if (!trx) throw new NotFoundException('Transaction not found')
+    if (!trx.store || trx.store.ownerId !== userId) {
+      throw new ForbiddenException('You do not own this store')
+    }
+
+    const { status } = dto
+    const isProgress = status === TransactionStatus.IN_PROGRESS
+    const statusLabel = isProgress ? 'Pesanan sedang diproses' : 'Pesanan selesai'
+
+    await this.prisma.$transaction([
+      this.prisma.transactionLog.create({
+        data: {
+          transactionId: id,
+          action: status as TransactionAction,
+          message: statusLabel,
+        },
+      }),
+      this.prisma.transaction.update({
+        where: { id },
+        data: { status },
+      }),
+    ])
+
+    return { message: `Status updated to ${status}` }
   }
 
   async getTracking(id: string): Promise<TransactionTrackingResponseDto> {
