@@ -1,21 +1,77 @@
 import { PrismaClient, RoastLevel, UserRole } from "@prisma/client";
 import * as argon2 from 'argon2'
- 
+
 const prisma = new PrismaClient();
 
-
 async function main() {
-  
+  // ── SUPERADMIN ──
   const hashed = await argon2.hash('adminPassword')
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@kopi.com" },
+  const superadmin = await prisma.user.upsert({
+    where: { email: "superadmin@kopi.com" },
     update: {},
     create: {
-      name: "Admin Kopi",
-      email: "admin@kopi.com",
+      name: "Superadmin Kopi",
+      email: "superadmin@kopi.com",
       password: hashed,
-      role: UserRole.ADMIN,
+      role: UserRole.SUPERADMIN,
     },
+  });
+
+  // ── CUSTOMER ──
+  const customerHashed = await argon2.hash('customerPassword')
+  await prisma.user.upsert({
+    where: { email: "customer@kopi.com" },
+    update: {},
+    create: {
+      name: "Customer Satu",
+      email: "customer@kopi.com",
+      password: customerHashed,
+      role: UserRole.CUSTOMER,
+    },
+  });
+
+  // ── STOREOWNER + STORE ──
+  const ownerHashed = await argon2.hash('ownerPassword')
+  const storeOwner = await prisma.user.upsert({
+    where: { email: "owner@kopi.com" },
+    update: {},
+    create: {
+      name: "Budi Pemilik Toko",
+      email: "owner@kopi.com",
+      password: ownerHashed,
+      role: UserRole.STOREOWNER,
+    },
+  });
+
+  await prisma.store.upsert({
+    where: { slug: "kopiness-store" },
+    update: {},
+    create: {
+      name: "Kopiness Store",
+      slug: "kopiness-store",
+      description: "Toko kopi premium",
+      address: "Jl. Sudirman No. 1, Jakarta",
+      phone: "021-12345678",
+      latitude: -6.2088,
+      longitude: 106.8456,
+      ownerId: storeOwner.id,
+    },
+  });
+
+  // ── PRODUCTS ──
+  const store = await prisma.store.findUnique({ where: { slug: "kopiness-store" } });
+  const storeId = store?.id ?? undefined;
+
+  const productNames = [
+    "Gayo Arabica",
+    "Toraja Kalosi",
+    "Kintamani Bali",
+    "Flores Bajawa",
+    "Java Preanger",
+  ];
+
+  await prisma.product.deleteMany({
+    where: { name: { in: productNames } },
   });
 
   await prisma.product.createMany({
@@ -29,8 +85,9 @@ async function main() {
         flavorNotes: "Citrus, Floral, Clean",
         price: 85000,
         stock: 100,
-        imageUrl: "https://example.com/gayo.jpg",
-        createdById: admin.id,
+        imageUrl: ["https://example.com/gayo.jpg"],
+        createdById: storeOwner.id,
+        storeId,
       },
       {
         name: "Toraja Kalosi",
@@ -41,8 +98,9 @@ async function main() {
         flavorNotes: "Earthy, Dark Chocolate, Spices",
         price: 90000,
         stock: 80,
-        imageUrl: "https://example.com/toraja.jpg",
-        createdById: admin.id,
+        imageUrl: ["https://example.com/toraja.jpg"],
+        createdById: storeOwner.id,
+        storeId,
       },
       {
         name: "Kintamani Bali",
@@ -53,8 +111,9 @@ async function main() {
         flavorNotes: "Orange, Fruity, Sweet",
         price: 80000,
         stock: 120,
-        imageUrl: "https://example.com/kintamani.jpg",
-        createdById: admin.id,
+        imageUrl: ["https://example.com/kintamani.jpg"],
+        createdById: storeOwner.id,
+        storeId,
       },
       {
         name: "Flores Bajawa",
@@ -65,8 +124,9 @@ async function main() {
         flavorNotes: "Chocolate, Caramel, Nutty",
         price: 88000,
         stock: 70,
-        imageUrl: "https://example.com/flores.jpg",
-        createdById: admin.id,
+        imageUrl: ["https://example.com/flores.jpg"],
+        createdById: storeOwner.id,
+        storeId,
       },
       {
         name: "Java Preanger",
@@ -77,8 +137,9 @@ async function main() {
         flavorNotes: "Nutty, Sweet, Mild Acidity",
         price: 82000,
         stock: 90,
-        imageUrl: "https://example.com/preanger.jpg",
-        createdById: admin.id,
+        imageUrl: ["https://example.com/preanger.jpg"],
+        createdById: storeOwner.id,
+        storeId,
       },
     ],
   });

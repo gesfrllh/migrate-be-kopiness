@@ -1,11 +1,16 @@
-import { BadRequestException, Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { CreateStoreOwnerDto } from './dto/create-storeowner.dto';
 import { UserResponseDto } from '../common/types/auth';
-import { ApiBody, ApiResponse, } from '@nestjs/swagger';
+import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
 import { GoogleAuthGuard } from '../common/guards/google-auth.guard';
 import { JwtAuthGuard } from '../common/guards/jwt.auth.guard';
+import { JwtGuard } from '../common/guards/jwt.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 import { encryptToken } from '../utils/crypto.utils';
 @Controller('auth')
 export class AuthController {
@@ -16,6 +21,18 @@ export class AuthController {
   @ApiResponse({ status: 201, type: UserResponseDto })
   async register(@Body() data: RegisterDto): Promise<UserResponseDto> {
     return this.authService.register(data);
+  }
+
+  @Post('storeowners')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN)
+  @ApiBody({ type: CreateStoreOwnerDto })
+  @ApiResponse({ status: 201, type: UserResponseDto })
+  async createStoreOwner(
+    @Body() dto: CreateStoreOwnerDto,
+    @Req() req,
+  ): Promise<UserResponseDto> {
+    return this.authService.createStoreOwner(dto, req.user.id);
   }
 
   @Post('login')
@@ -33,7 +50,6 @@ export class AuthController {
       },
     },
   })
-  @Post('login')
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res,
@@ -47,8 +63,8 @@ export class AuthController {
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -82,13 +98,14 @@ export class AuthController {
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return res.redirect('http://localhost:3000/auth')
+    const frontendUrl = process.env.CORS_ORIGIN || 'http://localhost:3000'
+    return res.redirect(`${frontendUrl}/auth`)
   }
 
 

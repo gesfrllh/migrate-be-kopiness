@@ -49,6 +49,7 @@ export class ProductController {
   ) {
     const result = await this.productService.findAllByUser(
       user.id,
+      user.role,
       Number(query.page) || 1,
       Number(query.limit) || 10,
       query.search,

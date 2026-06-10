@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   UseGuards,
   Body,
   Req,
@@ -31,6 +32,7 @@ import { Roles } from 'src/common/decorators/roles.decorator'
 import { UserRole } from '@prisma/client'
 import { RolesGuard } from 'src/common/guards/roles.guard'
 import { TransactionTrackingResponseDto } from './tracking-dto/response.dto'
+import { UpdateStatusDto } from './dto/update-status.dto'
 
 @ApiTags('Transaction')
 @ApiBearerAuth()
@@ -101,7 +103,7 @@ export class TransactionController {
 
   @Post('history')
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.SUPERADMIN, UserRole.STOREOWNER)
   async getHistory(
     @Req() req: express.Request,
     @Body() query: AdminHistoryQueryDto,
@@ -126,12 +128,44 @@ export class TransactionController {
     return this.transactionService.getAdminSummary()
   }
 
+  @Get('store/orders')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.STOREOWNER)
+  @ApiOperation({ summary: 'StoreOwner get their store orders' })
+  getStoreOrders(
+    @Req() req: express.Request,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    if (!req.user) throw new UnauthorizedException()
+    return this.transactionService.getStoreOrders(req.user.id, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      status,
+    })
+  }
+
   @Get(':id')
   @UseGuards(JwtGuard)
   @ApiOperation({ summary: 'Get transaction detail' })
   @ApiParam({ name: 'id', type: String })
   getDetail(@Param('id') id: string) {
     return this.transactionService.getDetail(id)
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.STOREOWNER)
+  @ApiOperation({ summary: 'StoreOwner update order status (IN_PROGRESS / DELIVERED)' })
+  @ApiBody({ type: UpdateStatusDto })
+  updateStatus(
+    @Param('id') id: string,
+    @Req() req: express.Request,
+    @Body() dto: UpdateStatusDto,
+  ) {
+    if (!req.user) throw new UnauthorizedException()
+    return this.transactionService.updateStatus(id, req.user.id, dto)
   }
 
   @Get(':id/tracking')

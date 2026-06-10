@@ -16,7 +16,12 @@ export const ORDER_TRACKING_STEPS = [
   },
   {
     step: 4,
-    action: 'CANCELLED',
-    label: 'Pesanan dibatalkan',
+    action: 'IN_PROGRESS',
+    label: 'Pesanan diproses',
+  },
+  {
+    step: 5,
+    action: 'DELIVERED',
+    label: 'Pesanan selesai',
   },
 ]

@@ -1,25 +1,24 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { RegisterDto } from './dto/register.dto';
+import { CreateStoreOwnerDto } from './dto/create-storeowner.dto';
 import { GoogleUser, UserResponseDto } from '../common/types/auth';
-import { User } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService) { }
   async register(data: RegisterDto): Promise<UserResponseDto> {
-    const exist: User | null = await this.prisma?.user?.findUnique({
+    const exist = await this.prisma.user.findUnique({
       where: { email: data.email },
     });
 
     if (exist) {
-      throw new Error('Email already exists');
+      throw new BadRequestException('Email already exists');
     }
-
-    if (exist) throw new Error('Email already exists');
 
     const hashedPassword = await argon2.hash(data.password);
 
@@ -27,10 +26,59 @@ export class AuthService {
       data: {
         name: data.name,
         email: data.email,
-        role: data.role,
+        role: UserRole.CUSTOMER,
         password: hashedPassword,
       },
     });
+
+    const { password, ...safe } = user;
+
+    return safe;
+  }
+
+  async createStoreOwner(dto: CreateStoreOwnerDto, superadminId: string): Promise<UserResponseDto> {
+    const superadmin = await this.prisma.user.findUnique({
+      where: { id: superadminId },
+      select: { role: true },
+    });
+
+    if (!superadmin || superadmin.role !== UserRole.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can create store owners');
+    }
+
+    const exist = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (exist) {
+      throw new BadRequestException('Email already exists');
+    }
+
+    const hashedPassword = await argon2.hash(dto.password);
+
+    const user = await this.prisma.user.create({
+      data: {
+        name: dto.name,
+        email: dto.email,
+        role: UserRole.STOREOWNER,
+        password: hashedPassword,
+      },
+    });
+
+    if (dto.storeName) {
+      const slug = dto.storeName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      await this.prisma.store.create({
+        data: {
+          name: dto.storeName,
+          slug,
+          ownerId: user.id,
+        },
+      });
+    }
 
     const { password, ...safe } = user;
 
@@ -96,7 +144,7 @@ export class AuthService {
         data: {
           email: googleUser.email,
           name: googleUser.name ?? 'Google User',
-          role: 'CUSTOMER',
+          role: UserRole.CUSTOMER,
           password: null,
         },
       })

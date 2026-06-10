@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
-import { UserRole } from '@prisma/client';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -35,14 +34,13 @@ describe('AuthController', () => {
         name: 'John',
         email: 'john@example.com',
         password: '123456',
-        role: UserRole.CUSTOMER,
       };
 
       mockAuthService.register.mockResolvedValue({
         id: '1',
         name: dto.name,
         email: dto.email,
-        role: dto.role,
+        role: 'CUSTOMER',
       });
 
       const result = await controller.register(dto);

@@ -1,7 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 // src/auth/dto/register.dto.ts
 import { IsEmail, IsString, MinLength } from 'class-validator';
-import { UserRole } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -10,7 +8,7 @@ export class RegisterDto {
   name: string;
 
   @ApiProperty({
-    example: 'jhon@email.co,m',
+    example: 'jhon@email.com',
     description: 'Email address of the user',
   })
   @IsEmail()
@@ -23,8 +21,4 @@ export class RegisterDto {
   @IsString()
   @MinLength(6)
   password: string;
-
-  @ApiProperty({ example: 'CUSTOMER', description: 'Role of the user' })
-  @IsString()
-  role: UserRole;
 }

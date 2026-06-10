@@ -16,6 +16,13 @@ export interface BrewStep {
   detail: string;
 }
 
+export interface ProblemContext {
+  key: string;
+  label: string;
+  description: string;
+  severity: "RENDAH" | "SEDANG" | "TINGGI";
+}
+
 export interface CoffeGuide {
   title: string;
   description: string;
@@ -26,6 +33,7 @@ export interface CoffeGuide {
   milkVolume?: number;
   milkTemp?: number;
   foamDensity?: "THIN" | "MEDIUM" | "THICK";
+  potentialProblems?: ProblemContext[];
 }
 
 @Injectable()
@@ -107,6 +115,8 @@ export class CoffeAssistantService {
       detail: "Pour into cup and enjoy your coffee!",
     });
 
+    const potentialProblems = this.generateProblemContexts(dto, { ratio, waterTemp, grindSize });
+
     return {
       title,
       description,
@@ -117,7 +127,106 @@ export class CoffeAssistantService {
       milkVolume,
       milkTemp,
       foamDensity,
+      potentialProblems,
     };
+  }
+
+  /* ===============================
+     PROBLEM CONTEXT GENERATOR
+  =============================== */
+
+  private generateProblemContexts(
+    dto: CoffeeAssistantDto,
+    profile: { ratio: number; waterTemp: number; grindSize: string },
+  ): ProblemContext[] {
+    const problems: ProblemContext[] = [];
+
+    // Roast-based problems
+    if (dto.roastLevel === "LIGHT") {
+      problems.push({
+        key: "TERLALU_ASAM",
+        label: "Terlalu Asam",
+        description: `Light roast butuh suhu tinggi (${profile.waterTemp + 1}–96°C) dan ekstraksi lebih lama. Jika under-extracted, rasa asam/sour akan dominan.`,
+        severity: "TINGGI",
+      });
+      problems.push({
+        key: "KURANG_MANIS",
+        label: "Kurang Manis",
+        description: "Light roast punya potensi sweetness tinggi tapi sulit diekstrak. Pastikan suhu cukup tinggi dan contact time optimal.",
+        severity: "SEDANG",
+      });
+    } else if (dto.roastLevel === "DARK") {
+      problems.push({
+        key: "TERLALU_PAHIT",
+        label: "Terlalu Pahit",
+        description: `Dark roast mudah over-extracted. Turunkan suhu ke ${profile.waterTemp - 2}–${profile.waterTemp}°C dan perpendek contact time.`,
+        severity: "TINGGI",
+      });
+      problems.push({
+        key: "AFTERTASTE_BURUK",
+        label: "Aftertaste Buruk",
+        description: "Dark roast rawan menghasilkan rasa burnt/ashy jika over-extracted atau suhu terlalu tinggi.",
+        severity: "SEDANG",
+      });
+    }
+
+    // Ratio-based problems
+    if (profile.ratio > 16) {
+      problems.push({
+        key: "TERLALU_LEMAH",
+        label: "Terlalu Lemah",
+        description: `Rasio 1:${profile.ratio} cukup tinggi. Kopi berisiko watery/thin. Pertimbangkan turunkan ke 1:${profile.ratio - 1} atau perhalus grind.`,
+        severity: profile.ratio > 17 ? "TINGGI" : "SEDANG",
+      });
+    } else if (profile.ratio < 14) {
+      problems.push({
+        key: "TERLALU_KUAT",
+        label: "Terlalu Kuat",
+        description: `Rasio 1:${profile.ratio} cukup rendah. Kopi berisiko terlalu pekat/intense. Bisa naikkan ke 1:${profile.ratio + 1} jika perlu.`,
+        severity: profile.ratio < 13 ? "TINGGI" : "SEDANG",
+      });
+    }
+
+    // Method-based problems
+    if (dto.drinkName === "ESPRESSO" || dto.drinkType === "MILK") {
+      problems.push({
+        key: "KURANG_BODY",
+        label: "Kurang Body",
+        description: `Espresso dengan ${dto.roastLevel.toLowerCase()} roast butuh grind yang tepat. Jika body kurang, perhalus grind atau naikkan dose.`,
+        severity: "SEDANG",
+      });
+    }
+
+    if (dto.drinkName === "V60" || dto.drinkName === "KALITA") {
+      problems.push({
+        key: "TERLALU_FLAT",
+        label: "Terlalu Flat",
+        description: "Pour-over rawan flat extraction jika pouring tidak konsisten. Pastikan circular pour dengan flow rate stabil.",
+        severity: "SEDANG",
+      });
+    }
+
+    // Milk-based problems
+    if (dto.milkType) {
+      problems.push({
+        key: "KURANG_MANIS",
+        label: "Kurang Manis",
+        description: `Susu ${dto.milkType.toLowerCase()} bisa meredam sweetness kopi. Sesuaikan ratio kopi:susu atau pilih milk-alternative yang lebih sweet.`,
+        severity: "RENDAH",
+      });
+    }
+
+    // Ice-based problems
+    if (dto.ice) {
+      problems.push({
+        key: "TERLALU_LEMAH",
+        label: "Terlalu Lemah (Dilusi)",
+        description: "Es menyebabkan dilusi. Kompensasi dengan rasio lebih kuat (1:12–1:13) atau brew langsung ke es (Japanese iced).",
+        severity: "TINGGI",
+      });
+    }
+
+    return problems;
   }
 
   /* ===============================
