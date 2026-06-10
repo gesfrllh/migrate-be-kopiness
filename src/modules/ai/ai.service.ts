@@ -4,6 +4,27 @@ import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
 @Injectable()
 export class AiService {
   private ai: any = null;
+  private async generateWithRetry(prompt: string) {
+    const maxRetry = 3;
+
+    for (let i = 0; i < maxRetry; i++) {
+      try {
+        return await this.ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: prompt,
+        });
+      } catch (error: any) {
+        if (error.status === 503 && i < maxRetry - 1) {
+          await new Promise((r) =>
+            setTimeout(r, 2000 * (i + 1))
+          );
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
 
   async adjustCoffee(dto: CoffeeAssistantDto) {
 
@@ -176,10 +197,7 @@ ${dto.ice ? `## ICE ADJUSTMENT NOTE\nKopi iced mengalami dilusi saat es mencair.
 
 
     try {
-      const response = await this.ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-      });
+      const response = await this.generateWithRetry(prompt);
 
       const rawText = response.text;
 
