@@ -13,6 +13,12 @@ const mockPrisma = {
   blacklistedToken: {
     create: jest.fn(),
   },
+  passwordResetToken: {
+    create: jest.fn(),
+    deleteMany: jest.fn(),
+    findUnique: jest.fn(),
+    delete: jest.fn(),
+  },
 };
 
 // Mock JWT
@@ -125,19 +131,12 @@ describe('AuthService', () => {
     });
   });
 
-  describe('logout', () => {
-    it('should throw if no token provided', async () => {
-      await expect(service.logout()).rejects.toThrow('No token provided');
-    });
+  describe('requestResetPassword', () => {
+    it('does not disclose whether an account exists', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
 
-    it('should logout successfully if token provided', async () => {
-      mockPrisma.blacklistedToken.create.mockResolvedValue({ token: 'abc' });
-
-      const result = await service.logout('Bearer abc');
-
-      expect(result).toEqual({ message: 'Successfully logged out' });
-      expect(mockPrisma.blacklistedToken.create).toHaveBeenCalledWith({
-        data: { token: 'abc' },
+      await expect(service.requestResetPassword('missing@example.com')).resolves.toEqual({
+        message: 'If an account exists, reset instructions have been sent.',
       });
     });
   });

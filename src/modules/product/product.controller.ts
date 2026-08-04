@@ -3,6 +3,9 @@ import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/createProduct.dto';
 import { UpdateProductDto } from './dto/updateProduct.dto';
 import { JwtGuard } from '../../common/guards/jwt.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 import {
   ApiBody,
   ApiOkResponse,
@@ -23,7 +26,8 @@ export class ProductController {
   constructor(private readonly productService: ProductService) { }
 
   @Post()
-  @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.STOREOWNER)
   @ApiBody({ type: CreateProductDto })
   @ApiCreatedResponse({
     description: 'Product created successfully',
@@ -69,13 +73,15 @@ export class ProductController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.STOREOWNER)
   update(@Param('id') id: string, @Body() dto: UpdateProductDto, @Req() req: any) {
     return this.productService.update(id, dto, req.user.id);
   }
 
   @Delete(':id')
-  @UseGuards(JwtGuard)
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.STOREOWNER)
   remove(@Param('id') id: string, @Req() req: any) {
     return this.productService.remove(id, req.user.id);
   }

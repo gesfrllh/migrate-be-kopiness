@@ -30,6 +30,31 @@ async function main() {
     },
   });
 
+  // ── COURIERS ──
+  const courierPassword = await argon2.hash('courierPassword')
+  await Promise.all([
+    prisma.user.upsert({
+      where: { email: 'kurir.andi@kopi.com' },
+      update: { name: 'Andi Kurir', role: UserRole.COURIER },
+      create: {
+        name: 'Andi Kurir',
+        email: 'kurir.andi@kopi.com',
+        password: courierPassword,
+        role: UserRole.COURIER,
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: 'kurir.siti@kopi.com' },
+      update: { name: 'Siti Kurir', role: UserRole.COURIER },
+      create: {
+        name: 'Siti Kurir',
+        email: 'kurir.siti@kopi.com',
+        password: courierPassword,
+        role: UserRole.COURIER,
+      },
+    }),
+  ])
+
   // ── STOREOWNER + STORE ──
   const ownerHashed = await argon2.hash('ownerPassword')
   const storeOwner = await prisma.user.upsert({

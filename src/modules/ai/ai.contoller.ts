@@ -1,4 +1,4 @@
-import { Body, Controller, Post, HttpException, HttpStatus } from "@nestjs/common";
+import { Body, Controller, Post, HttpException, HttpStatus, Logger } from "@nestjs/common";
 import { AiService } from "./ai.service";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
@@ -6,6 +6,8 @@ import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
 @ApiTags('AI')
 @Controller('ai')
 export class AiController {
+  private readonly logger = new Logger(AiController.name);
+
   constructor(private readonly aiService: AiService) { }
 
   @Post('coffe-assistant')
@@ -23,9 +25,11 @@ export class AiController {
         data: result
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'AI provider request failed';
+      this.logger.error(message);
       throw new HttpException({
         success: false,
-        message: 'Coffe assistant failed.'
+        message,
       },
         HttpStatus.INTERNAL_SERVER_ERROR
       )

@@ -61,8 +61,33 @@ export const TRANSACTION_ACTION_CONFIG: Record<
     label: 'Pesanan Diproses',
     visible: true,
   },
-  DELIVERED: {
+  ACCEPTED: {
+    step: 4,
+    label: 'Pesanan diterima',
+    visible: true,
+  },
+  REJECTED: {
+    step: 4,
+    label: 'Pesanan ditolak',
+    visible: true,
+  },
+  PREPARING: {
     step: 5,
+    label: 'Pesanan disiapkan',
+    visible: true,
+  },
+  HANDED_TO_COURIER: {
+    step: 6,
+    label: 'Pesanan diserahkan ke kurir',
+    visible: true,
+  },
+  ON_DELIVERY: {
+    step: 7,
+    label: 'Pesanan sedang diantar',
+    visible: true,
+  },
+  DELIVERED: {
+    step: 8,
     label: 'Pesanan Selesai',
     visible: true,
   },

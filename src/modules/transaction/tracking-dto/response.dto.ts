@@ -25,4 +25,13 @@ export class TransactionTrackingResponseDto {
     description: 'Blueprint step order'
   })
   steps: TransactionTrackingStepDto[]
+
+  @ApiProperty({ required: false, nullable: true })
+  courier?: { id: string; name: string } | null
+
+  @ApiProperty({ required: false, nullable: true })
+  location?: { latitude: number | null; longitude: number | null; updatedAt: Date } | null
+
+  @ApiProperty()
+  destination: { address: string; latitude: number; longitude: number }
 }

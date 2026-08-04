@@ -14,10 +14,13 @@ model User {
   password String?
   role     UserRole @default(CUSTOMER)
 
-  products     Product[]
-  transactions Transaction[]
-  stores       Store[]        @relation("StoreOwner")
-  cart         Cart?
+  products        Product[]
+  transactions    Transaction[]
+  stores          Store[]       @relation("StoreOwner")
+  cart            Cart?
+  chatsAsCustomer Chat[]        @relation("CustomerChats")
+  messages        Message[]
+  courierTransactions Transaction[] @relation("Courier")
 }
 
 model Store {
@@ -38,6 +41,7 @@ model Store {
   ownerId     String
   products    Product[]
   transactions Transaction[]
+  chats        Chat[]
 
   @@index([ownerId])
   @@index([slug])
@@ -65,6 +69,7 @@ model Product {
 
   @@index([createdById])
   @@index([storeId])
+  @@index([storeId, createdAt])
 }
 
 enum RoastLevel {
@@ -129,19 +134,35 @@ model Transaction {
   storeId     String?
 
   store     Store?         @relation(fields: [storeId], references: [id])
+  courier   User?          @relation("Courier", fields: [courierId], references: [id])
+  courierId String?
+  courierLatitude  Float?
+  courierLongitude Float?
+  locationUpdatedAt DateTime?
+  deliveryAddress   String
+  deliveryLatitude  Float
+  deliveryLongitude Float
   paymentId       String?
   payment         Payment?         @relation(fields: [paymentId], references: [id])
   transactionLogs TransactionLog[]
 
   @@index([status, createdAt])
+  @@index([storeId, status])
+  @@index([createdById, status])
   @@index([createdById])
   @@index([paymentId])
   @@index([storeId])
+  @@index([courierId, status])
 }
 
 enum TransactionStatus {
   PENDING
   PAID
+  ACCEPTED
+  REJECTED
+  PREPARING
+  HANDED_TO_COURIER
+  ON_DELIVERY
   IN_PROGRESS
   DELIVERED
   CANCELLED
@@ -150,6 +171,7 @@ enum TransactionStatus {
 enum UserRole {
   SUPERADMIN
   STOREOWNER
+  COURIER
   CUSTOMER
 }
 
@@ -159,6 +181,40 @@ model BlacklistedToken {
   createdAt DateTime @default(now())
 
   @@index([createdAt]) // ✅ Index untuk cleanup old tokens
+}
+
+model Chat {
+  id          String   @id @default(uuid())
+  customerId  String
+  storeId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer User  @relation("CustomerChats", fields: [customerId], references: [id], onDelete: Cascade)
+  store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([customerId, storeId])
+  @@index([customerId])
+  @@index([storeId])
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  chatId    String
+  senderId  String
+  content   String
+  replyToId String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  chat    Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender  User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo Message? @relation("ReplyRelation", fields: [replyToId], references: [id])
+  replies Message[] @relation("ReplyRelation")
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
 }
 
 model orderSequence {
@@ -230,5 +286,10 @@ enum TransactionAction {
   STOCK_DEDUCTED
   REFUNDED
   IN_PROGRESS
+  ACCEPTED
+  REJECTED
+  PREPARING
+  HANDED_TO_COURIER
+  ON_DELIVERY
   DELIVERED
 }

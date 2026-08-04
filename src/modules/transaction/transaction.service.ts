@@ -14,6 +14,8 @@ import { TransactionTrackingResponseDto } from "./tracking-dto/response.dto";
 import { mapLogsToTracking } from "./mapper/transaction-tracking.mapper";
 import { buildOrderTracking } from "./mapper/transaction-tracking.enriched.mapper";
 import { UpdateStatusDto } from "./dto/update-status.dto";
+import { UpdateCourierLocationDto } from "./dto/update-courier-location.dto";
+import { canTransitionOrder } from "./config/order-lifecycle";
 
 @Injectable()
 export class TransactionService {
@@ -28,7 +30,12 @@ export class TransactionService {
   ): Promise<CashierTransactionDto> {
 
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const productId = dto.items.map(i => i.productId)
+    const quantities = new Map<string, number>()
+    for (const item of dto.items) {
+      quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity)
+    }
+    const items = [...quantities].map(([productId, quantity]) => ({ productId, quantity }))
+    const productId = items.map(i => i.productId)
 
     const [products, seq] = await Promise.all([
       this.prisma.product.findMany({
@@ -45,7 +52,7 @@ export class TransactionService {
     const productMap = new Map(products.map(p => [p.id, p]))
     let total = 0
 
-    for (const item of dto.items) {
+    for (const item of items) {
       const product = productMap.get(item.productId)
       if (!product) {
         throw new NotFoundException(`Product ${item.productId} not found`)
@@ -54,6 +61,11 @@ export class TransactionService {
         throw new BadRequestException(`Stock not enough for ${product.name}`)
       }
       total += product.price * item.quantity
+    }
+
+    const storeIds = new Set(products.map((product) => product.storeId))
+    if (storeIds.size !== 1 || storeIds.has(null)) {
+      throw new BadRequestException('All products in an order must belong to the same store')
     }
 
     const orderNumber = formatOrderNumber(today, seq.value)
@@ -68,13 +80,16 @@ export class TransactionService {
           createdBy: { connect: { id: userId } },
           status: TransactionStatus.PENDING,
           total,
+          deliveryAddress: dto.deliveryAddress,
+          deliveryLatitude: dto.deliveryLatitude,
+          deliveryLongitude: dto.deliveryLongitude,
           ...(storeId ? { store: { connect: { id: storeId } } } : {}),
         },
         select: { id: true }
       })
 
       await tx.transactionItem.createMany({
-        data: dto.items.map(item => ({
+        data: items.map(item => ({
           transactionId: created.id,
           productId: item.productId,
           quantity: item.quantity,
@@ -122,12 +137,16 @@ export class TransactionService {
 
     return mapToCashierDto(transaction)
   }
-  async getCashierQueue() {
+  async getCashierQueue(user: { id: string; role: UserRole }) {
+    const where: { status: TransactionStatus; store?: { ownerId: string } } = {
+      status: TransactionStatus.PENDING,
+    }
+    if (user.role === UserRole.STOREOWNER) {
+      where.store = { ownerId: user.id }
+    }
 
     const transactions = await this.prisma.transaction.findMany({
-      where: {
-        status: TransactionStatus.PENDING,
-      },
+      where,
       orderBy: {
         createdAt: 'asc'
       },
@@ -207,7 +226,7 @@ export class TransactionService {
     })
   }
 
-  async pay(dto: PayTransactionsDto) {
+  async pay(dto: PayTransactionsDto, user: { id: string; role: UserRole }) {
     const { transactionIds, method } = dto
 
     const paymentMethod = this.paymentService.getMethodById(method)
@@ -220,7 +239,8 @@ export class TransactionService {
       const transactions = await tx.transaction.findMany({
         where: {
           id: { in: transactionIds },
-          status: TransactionStatus.PENDING
+          status: TransactionStatus.PENDING,
+          ...(user.role === UserRole.STOREOWNER ? { store: { ownerId: user.id } } : {}),
         },
         include: {
           items: true
@@ -355,7 +375,7 @@ export class TransactionService {
     }
   }
 
-  async getDetail(id: string) {
+  async getDetail(id: string, user: { id: string; role: UserRole }) {
     // const trx = this.prisma.transaction.findUnique({
     //   where: { id },
     //   include: {
@@ -394,6 +414,13 @@ export class TransactionService {
           },
         },
 
+        store: {
+          select: { ownerId: true },
+        },
+
+        courier: {
+          select: { id: true, name: true },
+        },
         payment: true,
 
         items: {
@@ -423,6 +450,12 @@ export class TransactionService {
       )
     }
 
+    const ownsTransaction = trx.createdBy.id === user.id
+    const ownsStore = user.role === UserRole.STOREOWNER && trx.store?.ownerId === user.id
+    if (user.role !== UserRole.SUPERADMIN && !ownsTransaction && !ownsStore) {
+      throw new ForbiddenException('You do not have access to this transaction')
+    }
+
     const timeline = mapLogsToTracking(
       trx.transactionLogs
     )
@@ -439,11 +472,22 @@ export class TransactionService {
       createdBy: trx.createdBy,
       payment: trx.payment,
       items: trx.items,
-      tracking: {
-        timeline,
-        steps,
-        progressPercent
-      }
+        tracking: {
+          timeline,
+          steps,
+          progressPercent,
+          courier: trx.courier,
+          location: trx.locationUpdatedAt ? {
+            latitude: trx.courierLatitude,
+            longitude: trx.courierLongitude,
+            updatedAt: trx.locationUpdatedAt,
+          } : null,
+          destination: {
+            address: trx.deliveryAddress,
+            latitude: trx.deliveryLatitude,
+            longitude: trx.deliveryLongitude,
+          },
+        }
     }
   }
 
@@ -585,9 +629,36 @@ export class TransactionService {
     ])
 
     return {
-      data,
+      data: data.map((transaction) => ({
+        id: transaction.id,
+        orderNumber: transaction.orderNumber,
+        customer: transaction.createdBy.name,
+        status: transaction.status,
+        total: transaction.total,
+        createdAt: transaction.createdAt,
+      })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     }
+  }
+
+  async getCourierOrders(courierId: string) {
+    return this.prisma.transaction.findMany({
+      where: {
+        courierId,
+        status: { in: [TransactionStatus.HANDED_TO_COURIER, TransactionStatus.ON_DELIVERY] },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        store: { select: { name: true, address: true, phone: true } },
+        createdBy: { select: { name: true } },
+        items: { select: { quantity: true, product: { select: { name: true } } } },
+      },
+    })
   }
 
   async updateStatus(id: string, userId: string, dto: UpdateStatusDto) {
@@ -595,26 +666,32 @@ export class TransactionService {
       where: { id },
       select: {
         id: true,
+        status: true,
+        courierId: true,
         storeId: true,
         store: { select: { ownerId: true } },
       },
     })
 
     if (!trx) throw new NotFoundException('Transaction not found')
-    if (!trx.store || trx.store.ownerId !== userId) {
-      throw new ForbiddenException('You do not own this store')
-    }
-
     const { status } = dto
-    const isProgress = status === TransactionStatus.IN_PROGRESS
-    const statusLabel = isProgress ? 'Pesanan sedang diproses' : 'Pesanan selesai'
+    const isStoreOwner = trx.store?.ownerId === userId
+    const isAssignedCourier = trx.courierId === userId
+    const role = isStoreOwner ? UserRole.STOREOWNER : isAssignedCourier ? UserRole.COURIER : null
+    if (!role) throw new ForbiddenException('You cannot update this order')
+    if (status === TransactionStatus.HANDED_TO_COURIER && !trx.courierId) {
+      throw new BadRequestException('Assign a courier before handing off this order')
+    }
+    if (!canTransitionOrder(trx.status, status, role)) {
+      throw new BadRequestException(`Cannot change ${trx.status} to ${status}`)
+    }
 
     await this.prisma.$transaction([
       this.prisma.transactionLog.create({
         data: {
           transactionId: id,
           action: status as TransactionAction,
-          message: statusLabel,
+          message: `Status diubah ke ${status}`,
         },
       }),
       this.prisma.transaction.update({
@@ -626,10 +703,63 @@ export class TransactionService {
     return { message: `Status updated to ${status}` }
   }
 
-  async getTracking(id: string): Promise<TransactionTrackingResponseDto> {
+  async assignCourier(id: string, userId: string, courierId: string) {
+    const [trx, courier] = await Promise.all([
+      this.prisma.transaction.findUnique({
+        where: { id },
+        select: { id: true, status: true, store: { select: { ownerId: true } } },
+      }),
+      this.prisma.user.findUnique({ where: { id: courierId }, select: { id: true, role: true, name: true } }),
+    ])
+
+    if (!trx) throw new NotFoundException('Transaction not found')
+    if (trx.store?.ownerId !== userId) throw new ForbiddenException('You do not own this store')
+    if (trx.status !== TransactionStatus.PREPARING) {
+      throw new BadRequestException('Courier can only be assigned while order is being prepared')
+    }
+    if (!courier || courier.role !== UserRole.COURIER) {
+      throw new BadRequestException('Courier not found')
+    }
+
+    await this.prisma.transaction.update({ where: { id }, data: { courierId } })
+    return { message: 'Courier assigned', courier: { id: courier.id, name: courier.name } }
+  }
+
+  async updateCourierLocation(id: string, userId: string, dto: UpdateCourierLocationDto) {
+    const trx = await this.prisma.transaction.findUnique({
+      where: { id },
+      select: { courierId: true, status: true },
+    })
+    if (!trx) throw new NotFoundException('Transaction not found')
+    if (trx.courierId !== userId) throw new ForbiddenException('You are not assigned to this order')
+    if (trx.status !== TransactionStatus.ON_DELIVERY) {
+      throw new BadRequestException('Location can only be updated while order is on delivery')
+    }
+
+    await this.prisma.transaction.update({
+      where: { id },
+      data: {
+        courierLatitude: dto.latitude,
+        courierLongitude: dto.longitude,
+        locationUpdatedAt: new Date(),
+      },
+    })
+    return { message: 'Courier location updated' }
+  }
+
+  async getTracking(id: string, user: { id: string; role: UserRole }): Promise<TransactionTrackingResponseDto> {
     const trx = await this.prisma.transaction.findUnique({
       where: { id },
       select: {
+        createdById: true,
+        courierLatitude: true,
+        courierLongitude: true,
+        locationUpdatedAt: true,
+        deliveryAddress: true,
+        deliveryLatitude: true,
+        deliveryLongitude: true,
+        courier: { select: { id: true, name: true } },
+        store: { select: { ownerId: true } },
         orderNumber: true,
         status: true,
         transactionLogs: {
@@ -650,6 +780,12 @@ export class TransactionService {
       throw new NotFoundException('Transaction Not Found')
     }
 
+    const ownsTransaction = trx.createdById === user.id
+    const ownsStore = user.role === UserRole.STOREOWNER && trx.store?.ownerId === user.id
+    if (user.role !== UserRole.SUPERADMIN && !ownsTransaction && !ownsStore) {
+      throw new ForbiddenException('You do not have access to this transaction')
+    }
+
     const timeline = mapLogsToTracking(trx.transactionLogs)
 
     const { steps, progressPercent } = buildOrderTracking(timeline)
@@ -659,7 +795,18 @@ export class TransactionService {
       status: trx.status,
       progressPercent,
       timeline,
-      steps
+      steps,
+      courier: trx.courier,
+      location: trx.locationUpdatedAt ? {
+        latitude: trx.courierLatitude,
+        longitude: trx.courierLongitude,
+        updatedAt: trx.locationUpdatedAt,
+      } : null,
+      destination: {
+        address: trx.deliveryAddress,
+        latitude: trx.deliveryLatitude,
+        longitude: trx.deliveryLongitude,
+      },
     }
   }
 

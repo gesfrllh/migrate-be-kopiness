@@ -14,18 +14,18 @@ export class CoffeeAssistantDto {
 
   @ApiProperty({
     example: 'ESPRESSO',
-    enum: ['V60', 'FRENCH_PRESS', 'ESPRESSO', 'LATTE', 'AEROPRESS'],
+    enum: ['V60', 'KALITA', 'CLEVER', 'FRENCH_PRESS', 'AEROPRESS', 'ESPRESSO', 'LATTE', 'CAPPUCCINO', 'MOCHA', 'FLAT_WHITE'],
   })
   @IsString()
-  @IsIn(['V60', 'FRENCH_PRESS', 'ESPRESSO', 'LATTE', 'AEROPRESS'])
+  @IsIn(['V60', 'KALITA', 'CLEVER', 'FRENCH_PRESS', 'AEROPRESS', 'ESPRESSO', 'LATTE', 'CAPPUCCINO', 'MOCHA', 'FLAT_WHITE'])
   method: string;
 
   @ApiProperty({
-    example: 'medium',
-    enum: ['light', 'medium', 'dark'],
+    example: 'MEDIUM',
+    enum: ['LIGHT', 'MEDIUM', 'DARK'],
   })
   @IsString()
-  @IsIn(['light', 'medium', 'dark'])
+  @IsIn(['LIGHT', 'MEDIUM', 'DARK'])
   roastLevel: string;
 
   @ApiProperty({
@@ -67,9 +67,9 @@ export class CoffeeAssistantDto {
   ice?: boolean;
 
 
-  @ApiProperty({ example: 'LIGHT', enum: ['LIGHT', 'BALANCED', 'STRONG'] })
-  @IsString()
-  strength?: string;
+  @ApiProperty({ example: 'NORMAL', enum: ['LIGHT', 'NORMAL', 'STRONG'] })
+  @IsIn(['LIGHT', 'NORMAL', 'STRONG'])
+  strength: string;
 
   @ApiPropertyOptional({
     example: 'terlalu asam'
@@ -99,10 +99,10 @@ export class CoffeeAssistantDto {
   @IsNumber()
   waterAmount?: number;
 
-  @ApiPropertyOptional({ example: '1:15' })
+  @ApiPropertyOptional({ example: 15 })
   @IsOptional()
-  @IsString()
-  ratio?: string;
+  @IsNumber()
+  ratio?: number;
 
   @ApiPropertyOptional({ example: 93 })
   @IsOptional()
