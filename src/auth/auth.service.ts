@@ -58,29 +58,32 @@ export class AuthService {
 
     const hashedPassword = await argon2.hash(dto.password);
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        role: UserRole.STOREOWNER,
-        password: hashedPassword,
-      },
-    });
+    const user = await this.prisma.$transaction(async (tx) => {
+      const owner = await tx.user.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          role: UserRole.STOREOWNER,
+          password: hashedPassword,
+        },
+      });
 
-    if (dto.storeName) {
+      if (!dto.storeName) return owner;
+
       const slug = dto.storeName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
-      await this.prisma.store.create({
+      await tx.store.create({
         data: {
           name: dto.storeName,
           slug,
-          ownerId: user.id,
+          ownerId: owner.id,
         },
       });
-    }
+      return owner;
+    });
 
     const { password, ...safe } = user;
 
@@ -148,8 +151,16 @@ export class AuthService {
     const token = decryptToken(encryptedToken);
     if (!token) return;
 
-    await this.prisma.blacklistedToken.create({
-      data: { token },
+    const decoded = jwt.decode(token);
+    const expiresAt = typeof decoded === 'object' && decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : null;
+    if (!expiresAt || expiresAt <= new Date()) return;
+
+    await this.prisma.blacklistedToken.upsert({
+      where: { token },
+      update: { expiresAt },
+      create: { token, expiresAt },
     });
     const payload = {
       message: 'Successfully logged out',
@@ -161,8 +172,12 @@ export class AuthService {
   async isBlacklisted(token: string): Promise<boolean> {
     const blacklisted = await this.prisma.blacklistedToken.findUnique({
       where: { token },
+      select: { expiresAt: true },
     });
-    return !!blacklisted;
+    if (!blacklisted) return false;
+    if (blacklisted.expiresAt > new Date()) return true;
+    await this.prisma.blacklistedToken.delete({ where: { token } });
+    return false;
   }
 
   async handleGoogleLogin(googleUser: GoogleUser) {

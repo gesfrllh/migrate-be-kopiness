@@ -10,8 +10,14 @@ const mockPrisma = {
     findUnique: jest.fn(),
     create: jest.fn(),
   },
+  store: {
+    create: jest.fn(),
+  },
   blacklistedToken: {
     create: jest.fn(),
+    upsert: jest.fn(),
+    findUnique: jest.fn(),
+    delete: jest.fn(),
   },
   passwordResetToken: {
     create: jest.fn(),
@@ -19,12 +25,16 @@ const mockPrisma = {
     findUnique: jest.fn(),
     delete: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
 
 // Mock JWT
 jest.mock('jsonwebtoken', () => ({
   sign: jest.fn().mockReturnValue('token123'),
+  decode: jest.fn(),
 }));
+
+jest.mock('../utils/crypto.utils', () => ({ decryptToken: jest.fn() }));
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -138,6 +148,45 @@ describe('AuthService', () => {
       await expect(service.requestResetPassword('missing@example.com')).resolves.toEqual({
         message: 'If an account exists, reset instructions have been sent.',
       });
+    });
+  });
+
+  describe('createStoreOwner', () => {
+    it('creates owner and optional store in one transaction', async () => {
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ role: 'SUPERADMIN' })
+        .mockResolvedValueOnce(null);
+      mockPrisma.$transaction.mockImplementation((callback) => callback(mockPrisma));
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'owner-1', name: 'Owner', email: 'owner@example.com', password: 'hash', role: 'STOREOWNER',
+      });
+
+      await expect(service.createStoreOwner({
+        name: 'Owner', email: 'owner@example.com', password: 'password123', storeName: 'Kopi Kita',
+      }, 'admin-1')).resolves.toMatchObject({ id: 'owner-1', email: 'owner@example.com' });
+
+      expect(mockPrisma.store.create).toHaveBeenCalledWith({
+        data: { name: 'Kopi Kita', slug: 'kopi-kita', ownerId: 'owner-1' },
+      });
+    });
+  });
+
+  describe('blacklist', () => {
+    it('upserts only unexpired tokens and removes expired entries', async () => {
+      const crypto = jest.requireMock('../utils/crypto.utils');
+      const jsonwebtoken = jest.requireMock('jsonwebtoken');
+      crypto.decryptToken.mockReturnValue('jwt-token');
+      jsonwebtoken.decode.mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 60 });
+
+      await service.logout('encrypted-token');
+      expect(mockPrisma.blacklistedToken.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        where: { token: 'jwt-token' },
+        create: expect.objectContaining({ token: 'jwt-token' }),
+      }));
+
+      mockPrisma.blacklistedToken.findUnique.mockResolvedValue({ expiresAt: new Date(Date.now() - 1) });
+      await expect(service.isBlacklisted('expired')).resolves.toBe(false);
+      expect(mockPrisma.blacklistedToken.delete).toHaveBeenCalledWith({ where: { token: 'expired' } });
     });
   });
 

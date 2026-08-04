@@ -178,9 +178,10 @@ enum UserRole {
 model BlacklistedToken {
   id        String   @id @default(uuid())
   token     String   @unique
+  expiresAt DateTime
   createdAt DateTime @default(now())
 
-  @@index([createdAt]) // ✅ Index untuk cleanup old tokens
+  @@index([expiresAt])
 }
 
 model Chat {

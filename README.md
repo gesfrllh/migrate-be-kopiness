@@ -69,6 +69,9 @@ cp .env.example .env
 | `AI_TIMEOUT_MS` | Batas waktu request AI dalam milidetik (default `10000`) |
 | `CORS_ORIGIN` | Origin untuk CORS (default `http://localhost:3000`) |
 | `FRONTEND_URL` | URL frontend untuk redirect & reset password |
+| `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER` | Kredensial Pusher untuk private realtime chat |
+
+Password reset production masih diblokir: tidak ada dependency atau provider email yang dikonfigurasi. Endpoint tetap menyimpan token hash; integrasikan provider email yang disetujui sebelum mengaktifkan delivery production.
 
 ## Instalasi
 

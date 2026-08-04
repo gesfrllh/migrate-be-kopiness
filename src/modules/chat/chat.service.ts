@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { pusher } from '../../lib/pusher';
+import { getPusher } from '../../lib/pusher';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { TypingDto } from './dto/typing.dto';
@@ -11,7 +11,26 @@ export class ChatService {
   constructor(private prisma: PrismaService) {}
 
   private chatChannel(chatId: string) {
-    return `chat-${chatId}`;
+    return `private-chat-${chatId}`;
+  }
+
+  private async assertMember(chatId: string, userId: string) {
+    const chat = await this.prisma.chat.findUnique({
+      where: { id: chatId },
+      select: { customerId: true, store: { select: { ownerId: true } } },
+    });
+    if (!chat) throw new NotFoundException('Chat not found');
+    if (chat.customerId !== userId && chat.store.ownerId !== userId) {
+      throw new ForbiddenException('Not your chat');
+    }
+  }
+
+  async authorizeChannel(chatId: string, userId: string, socketId: string) {
+    if (!socketId) throw new BadRequestException('socket_id is required');
+    await this.assertMember(chatId, userId);
+    const pusher = getPusher();
+    if (!pusher) throw new BadRequestException('Realtime chat is not configured');
+    return pusher.authorizeChannel(socketId, this.chatChannel(chatId), { user_id: userId });
   }
 
   async createChat(userId: string, dto: CreateChatDto) {
@@ -196,7 +215,7 @@ export class ChatService {
       createdAt: message.createdAt.toISOString(),
     };
 
-    pusher.trigger(this.chatChannel(chatId), 'new-message', payload)
+    getPusher()?.trigger(this.chatChannel(chatId), 'new-message', payload)
       .catch((err) => console.error('Pusher trigger failed:', err));
 
     return payload;
@@ -236,7 +255,7 @@ export class ChatService {
       readAt: updated.readAt!.toISOString(),
     };
 
-    pusher.trigger(this.chatChannel(chatId), 'message-read', payload)
+    getPusher()?.trigger(this.chatChannel(chatId), 'message-read', payload)
       .catch((err) => console.error('Pusher trigger failed:', err));
 
     return payload;
@@ -260,7 +279,7 @@ export class ChatService {
       isTyping: dto.isTyping,
     };
 
-    pusher.trigger(this.chatChannel(chatId), 'typing', payload)
+    getPusher()?.trigger(this.chatChannel(chatId), 'typing', payload)
       .catch((err) => console.error('Pusher trigger failed:', err));
 
     return payload;

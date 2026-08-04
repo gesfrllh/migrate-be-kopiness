@@ -27,6 +27,11 @@ export class ChatController {
     return this.chatService.listChats(req.user.id, req.user.role);
   }
 
+  @Post(':id/pusher-auth')
+  authorizePusher(@Req() req, @Param('id') id: string, @Body('socket_id') socketId: string) {
+    return this.chatService.authorizeChannel(id, req.user.id, socketId);
+  }
+
   @Get(':id')
   @ApiOkResponse({ type: ChatDetailDto })
   findOne(@Req() req, @Param('id') id: string) {
