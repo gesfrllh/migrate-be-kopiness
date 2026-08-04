@@ -48,6 +48,17 @@ export class StoreController {
     );
   }
 
+  // ── Store Owner — must precede `/:slug` ─────────────────
+
+  @Get('mine')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.STOREOWNER)
+  @ApiBearerAuth()
+  @ApiOkResponse({ description: 'My stores', type: StoreListOwnedResponseDto })
+  findMine(@Req() req: express.Request) {
+    return this.storeService.findMyStores(req.user!.id);
+  }
+
   @Get(':slug')
   @ApiQuery({ name: 'lat', required: false, type: Number })
   @ApiQuery({ name: 'lng', required: false, type: Number })
@@ -59,17 +70,6 @@ export class StoreController {
       lat ? parseFloat(lat) : undefined,
       lng ? parseFloat(lng) : undefined,
     );
-  }
-
-  // ── Store Owner — harus diatas `/:id` ───────────────────
-
-  @Get('mine')
-  @UseGuards(JwtGuard, RolesGuard)
-  @Roles(UserRole.STOREOWNER)
-  @ApiBearerAuth()
-  @ApiOkResponse({ description: 'My stores', type: StoreListOwnedResponseDto })
-  findMine(@Req() req: express.Request) {
-    return this.storeService.findMyStores(req.user!.id);
   }
 
   @Post()

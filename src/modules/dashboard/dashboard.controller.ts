@@ -14,7 +14,7 @@ export class DashboardController {
 
   @Get('overview')
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles(UserRole.SUPERADMIN && UserRole.STOREOWNER)
+  @Roles(UserRole.SUPERADMIN, UserRole.STOREOWNER)
   @ApiOkResponse({ type: DashboardOverviewDto })
   async overview(): Promise<DashboardOverviewDto> {
     return this.dashboardService.getOverview()

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
+import { GatewayTimeoutException, Injectable, InternalServerErrorException, ServiceUnavailableException } from "@nestjs/common";
 import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
 
 @Injectable()
@@ -7,6 +7,7 @@ export class AiService {
     const baseUrl = process.env.AI_BASE_URL?.replace(/\/$/, '');
     const apiKey = process.env.AI_API_KEY;
     const model = process.env.AI_MODEL;
+    const timeoutMs = Number(process.env.AI_TIMEOUT_MS) || 10000;
 
     if (!baseUrl || !apiKey || !model) {
       throw new InternalServerErrorException('AI provider is not configured');
@@ -16,24 +17,32 @@ export class AiService {
 
     for (let i = 0; i < maxRetry; i++) {
       try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            temperature: 0.2,
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a specialty coffee expert. Return valid JSON only.',
-              },
-              { role: 'user', content: prompt },
-            ],
-          }),
-        });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        let response: Response;
+        try {
+          response = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model,
+              temperature: 0.2,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a specialty coffee expert. Return valid JSON only.',
+                },
+                { role: 'user', content: prompt },
+              ],
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
 
         if (!response.ok) {
           if ((response.status === 429 || response.status >= 500) && i < maxRetry - 1) {
@@ -52,6 +61,9 @@ export class AiService {
 
         return content;
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new GatewayTimeoutException('AI provider timed out');
+        }
         if (i < maxRetry - 1) {
           await new Promise((r) =>
             setTimeout(r, 2000 * (i + 1))
@@ -249,8 +261,8 @@ export class AiService {
 
       return parsed;
     } catch (err) {
-      console.error(err);
-      throw new Error("Adjustment failed");
+      if (err instanceof InternalServerErrorException || err instanceof GatewayTimeoutException) throw err;
+      throw new ServiceUnavailableException('AI provider request failed');
     }
   }
 }

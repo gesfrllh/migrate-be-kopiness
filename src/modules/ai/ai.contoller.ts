@@ -1,7 +1,9 @@
-import { Body, Controller, Post, HttpException, HttpStatus, Logger } from "@nestjs/common";
+import { Body, Controller, HttpException, HttpStatus, Logger, Post, UseGuards } from "@nestjs/common";
+import { Throttle } from '@nestjs/throttler';
 import { AiService } from "./ai.service";
-import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { CoffeeAssistantDto } from "./dto/coffe-assitant.dto";
+import { JwtGuard } from '../../common/guards/jwt.guard';
 
 @ApiTags('AI')
 @Controller('ai')
@@ -11,6 +13,9 @@ export class AiController {
   constructor(private readonly aiService: AiService) { }
 
   @Post('coffe-assistant')
+  @UseGuards(JwtGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Generate Coffe Brew Guide using AI' })
   @ApiResponse({
     status: 200,
@@ -25,11 +30,12 @@ export class AiController {
         data: result
       }
     } catch (err) {
+      if (err instanceof HttpException) throw err;
       const message = err instanceof Error ? err.message : 'AI provider request failed';
       this.logger.error(message);
       throw new HttpException({
         success: false,
-        message,
+        message: 'AI provider request failed',
       },
         HttpStatus.INTERNAL_SERVER_ERROR
       )

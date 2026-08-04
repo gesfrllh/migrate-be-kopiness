@@ -63,7 +63,10 @@ cp .env.example .env
 | `GOOGLE_CALLBACK_URL` | Callback URL Google OAuth |
 | `COOKIE_ENCRYPTION_KEY` | Key enkripsi cookie (32 bytes hex) |
 | `SECRET_KEY` | Key AES-256-GCM (32 bytes hex) |
-| `GOOGLEAI_KEY` | API key Google Gemini AI |
+| `AI_BASE_URL` | Base URL provider AI yang OpenAI-compatible |
+| `AI_API_KEY` | API key provider AI |
+| `AI_MODEL` | Nama model provider AI |
+| `AI_TIMEOUT_MS` | Batas waktu request AI dalam milidetik (default `10000`) |
 | `CORS_ORIGIN` | Origin untuk CORS (default `http://localhost:3000`) |
 | `FRONTEND_URL` | URL frontend untuk redirect & reset password |
 
@@ -130,6 +133,7 @@ http://localhost:7243/api
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | GET | `/api/stores` | - | List active stores (sorted by distance if lat/lng) |
+| GET | `/api/stores/mine` | STOREOWNER | List toko milik user aktif |
 | GET | `/api/stores/:slug` | - | Detail store with products & distance |
 
 ### Products
@@ -191,13 +195,13 @@ http://localhost:7243/api
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/api/ai/coffe-assistant` | - | Diagnosa & rekomendasi adjustment brewing via Google Gemini |
+| POST | `/api/ai/coffe-assistant` | JWT | Diagnosa & rekomendasi adjustment brewing via provider AI; 5 request/menit per client |
 
 ### Dashboard
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/api/dashboard/overview` | - | Overview stats + payment breakdown + revenue chart + top products |
+| GET | `/api/dashboard/overview` | SUPERADMIN/STOREOWNER | Overview stats + payment breakdown + revenue chart + top products |
 
 ## Database Schema
 
