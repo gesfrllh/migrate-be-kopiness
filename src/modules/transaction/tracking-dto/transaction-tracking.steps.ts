@@ -14,13 +14,12 @@ export const ORDER_TRACKING_STEPS = [
     action: 'PAID',
     label: 'Pembayaran berhasil',
   },
+  { step: 4, action: 'ACCEPTED', label: 'Pesanan diterima' },
+  { step: 5, action: 'PREPARING', label: 'Pesanan disiapkan' },
+  { step: 6, action: 'HANDED_TO_COURIER', label: 'Pesanan diserahkan ke kurir' },
+  { step: 7, action: 'ON_DELIVERY', label: 'Pesanan sedang diantar' },
   {
-    step: 4,
-    action: 'IN_PROGRESS',
-    label: 'Pesanan diproses',
-  },
-  {
-    step: 5,
+    step: 8,
     action: 'DELIVERED',
     label: 'Pesanan selesai',
   },

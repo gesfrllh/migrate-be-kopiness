@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 import { NestFactory } from '@nestjs/core';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -16,6 +17,7 @@ import { PrismaClient } from '@prisma/client';
 
 const server = express();
 let initialized = false;
+const logger = new Logger('HTTP');
 
 async function bootstrap() {
   if (initialized) return;
@@ -29,6 +31,28 @@ async function bootstrap() {
   app.use(helmet());
 
   app.use(cookieParser());
+  app.use((req, res, next) => {
+    const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    const origin = req.get('origin');
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:7243',
+      process.env.CORS_ORIGIN,
+    ].filter((value): value is string => Boolean(value));
+
+    // Cookie-authenticated browser writes must originate from this app.
+    if (unsafeMethod && req.cookies?.access_token && (!origin || !allowedOrigins.includes(origin))) {
+      return res.status(403).json({ message: 'Invalid request origin' });
+    }
+    next();
+  });
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      logger.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${Date.now() - startedAt}ms`);
+    });
+    next();
+  });
 
   // Session & Passport Middleware
   const sessionSecret = process.env.SESSION_SECRET;
@@ -52,6 +76,11 @@ async function bootstrap() {
   app.use(passport.session());
 
   app.setGlobalPrefix('api');
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }));
 
   // Swagger — disable in production
   if (process.env.NODE_ENV !== 'production') {
@@ -70,7 +99,6 @@ async function bootstrap() {
   )
 
   // Enable CORS
-  const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
   app.enableCors({
     origin: (origin, callback) => {
       const allowed = [

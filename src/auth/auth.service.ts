@@ -6,7 +6,9 @@ import { RegisterDto } from './dto/register.dto';
 import { CreateStoreOwnerDto } from './dto/create-storeowner.dto';
 import { GoogleUser, UserResponseDto } from '../common/types/auth';
 import { User, UserRole } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { CreateCourierDto } from './dto/create-courier.dto';
+import { createHash, randomBytes } from 'node:crypto';
+import { decryptToken } from 'src/utils/crypto.utils';
 
 @Injectable()
 export class AuthService {
@@ -85,6 +87,35 @@ export class AuthService {
     return safe;
   }
 
+  async getUsers(): Promise<UserResponseDto[]> {
+    const users = await this.prisma.user.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    return users.map(({ password, ...user }) => user);
+  }
+
+  async getCouriers(): Promise<UserResponseDto[]> {
+    const users = await this.prisma.user.findMany({
+      where: { role: UserRole.COURIER },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    })
+    return users
+  }
+
+  async createCourier(dto: CreateCourierDto): Promise<UserResponseDto> {
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
+    if (existing) throw new BadRequestException('Email already registered')
+
+    const password = await argon2.hash(dto.password)
+    const user = await this.prisma.user.create({
+      data: { name: dto.name, email: dto.email, password, role: UserRole.COURIER },
+    })
+    const { password: _, ...safe } = user
+    return safe
+  }
+
   async login(
     email: string,
     password: string,
@@ -113,9 +144,9 @@ export class AuthService {
     return { token, user: safe, };
   }
 
-  async logout(authHeader?: string) {
-    const token = authHeader?.split(' ')[1];
-    if (!token) throw new BadRequestException('No token provided');
+  async logout(encryptedToken: string) {
+    const token = decryptToken(encryptedToken);
+    if (!token) return;
 
     await this.prisma.blacklistedToken.create({
       data: { token },
@@ -179,33 +210,36 @@ export class AuthService {
     })
 
     if (!user) {
-      throw new BadRequestException('Email not registered')
+      return { message: 'If an account exists, reset instructions have been sent.' }
     }
 
     const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
+    await this.prisma.passwordResetToken.deleteMany({ where: { email } });
     await this.prisma.passwordResetToken.create({
       data: {
-        token,
+        token: tokenHash,
         email,
         expiresAt
       }
     })
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
-    const resetLink = `${frontendUrl}/forgot-password/reset?token=${token}`
-
-    return {
-      message: 'Reset password link generated',
-      resetLink
+    if (process.env.NODE_ENV !== 'production') {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      console.info(`Password reset link for ${email}: ${frontendUrl}/forgot-password/reset?token=${token}`);
     }
+
+    // ponytail: production email delivery needs provider integration before enabling reset links.
+    return { message: 'If an account exists, reset instructions have been sent.' }
   }
 
   async resetPassword(token: string, newPassword: string) {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
     const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { token }
+      where: { token: tokenHash }
     })
 
     if (!resetToken) {
@@ -224,7 +258,7 @@ export class AuthService {
     })
 
     await this.prisma.passwordResetToken.delete({
-      where: { token }
+      where: { token: tokenHash }
     })
 
     return {

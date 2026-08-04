@@ -12,7 +12,12 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
-    super();
+    super({
+      log:
+        process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'local'
+          ? ['query', 'info', 'warn', 'error']
+          : ['warn', 'error'],
+    });
   }
 
   async onModuleInit() {

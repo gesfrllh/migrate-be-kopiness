@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
+import { JwtGuard } from '../../common/guards/jwt.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 describe('ProductController', () => {
   let controller: ProductController;
@@ -23,7 +25,12 @@ describe('ProductController', () => {
           useValue: mockProductService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtGuard)
+      .useValue({ canActivate: jest.fn() })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: jest.fn() })
+      .compile();
 
     controller = module.get<ProductController>(ProductController);
     service = module.get<ProductService>(ProductService);
@@ -49,9 +56,9 @@ describe('ProductController', () => {
       stock: 12,
     };
 
-    const user = { id: 'user-1' };
+    const req = { user: { id: 'user-1', role: 'STOREOWNER' } };
 
-    await controller.create(dto as any, user as any);
+    await controller.create(dto as any, req as any);
 
     expect(service.create).toHaveBeenCalledWith(dto, 'user-1');
   });
@@ -67,13 +74,14 @@ describe('ProductController', () => {
       },
     });
 
-    const user = { id: 'user-1' };
+    const user = { id: 'user-1', role: 'STOREOWNER' };
     const query = { page: 1, limit: 10, search: '' };
 
     await controller.findAll(user as any, query as any);
 
     expect(service.findAllByUser).toHaveBeenCalledWith(
       'user-1',
+      'STOREOWNER',
       1,
       10,
       '',
@@ -87,12 +95,12 @@ describe('ProductController', () => {
 
   it('should call service.update', async () => {
     const dto = { name: 'Updated' };
-    await controller.update('abc', dto as any);
-    expect(service.update).toHaveBeenCalledWith('abc', dto);
+    await controller.update('abc', dto as any, { user: { id: 'user-1' } });
+    expect(service.update).toHaveBeenCalledWith('abc', dto, 'user-1');
   });
 
   it('should call service.remove', async () => {
-    await controller.remove('abc');
-    expect(service.remove).toHaveBeenCalledWith('abc');
+    await controller.remove('abc', { user: { id: 'user-1' } });
+    expect(service.remove).toHaveBeenCalledWith('abc', 'user-1');
   });
 });

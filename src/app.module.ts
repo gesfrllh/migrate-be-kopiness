@@ -11,6 +11,7 @@ import { CoffeeAssistantModule } from './modules/coffe/coffe.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { StoreModule } from './modules/store/store.module';
 import { CartModule } from './modules/cart/cart.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CartModule } from './modules/cart/cart.module';
     CoffeeAssistantModule,
     StoreModule,
     CartModule,
+    ChatModule,
   ],
   providers: [
     {

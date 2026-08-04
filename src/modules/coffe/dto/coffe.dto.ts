@@ -34,8 +34,8 @@ export class CoffeeAssistantDto {
   @IsEnum(['LIGHT', 'MEDIUM', 'DARK'])
   roastLevel: string;
 
-  @ApiProperty({ enum: ['LIGHT', 'BALANCED', 'STRONG'] })
-  @IsEnum(['LIGHT', 'BALANCED', 'STRONG'])
+  @ApiProperty({ enum: ['LIGHT', 'NORMAL', 'STRONG'] })
+  @IsEnum(['LIGHT', 'NORMAL', 'STRONG'])
   strength: string;
 
   @ApiPropertyOptional({ enum: ['WHOLE', 'SKIM', 'OAT', 'ALMOND'] })

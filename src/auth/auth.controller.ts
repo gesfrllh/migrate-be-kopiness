@@ -2,9 +2,12 @@ import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { CreateStoreOwnerDto } from './dto/create-storeowner.dto';
+import { CreateCourierDto } from './dto/create-courier.dto';
 import { UserResponseDto } from '../common/types/auth';
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthGuard } from '../common/guards/google-auth.guard';
 import { JwtAuthGuard } from '../common/guards/jwt.auth.guard';
 import { JwtGuard } from '../common/guards/jwt.guard';
@@ -35,6 +38,29 @@ export class AuthController {
     return this.authService.createStoreOwner(dto, req.user.id);
   }
 
+  @Post('couriers')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN)
+  @ApiBody({ type: CreateCourierDto })
+  @ApiResponse({ status: 201, type: UserResponseDto })
+  createCourier(@Body() dto: CreateCourierDto): Promise<UserResponseDto> {
+    return this.authService.createCourier(dto)
+  }
+
+  @Get('users')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN)
+  getUsers() {
+    return this.authService.getUsers();
+  }
+
+  @Get('couriers')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.STOREOWNER)
+  getCouriers() {
+    return this.authService.getCouriers()
+  }
+
   @Post('login')
   @ApiBody({ type: LoginDto })
   @ApiResponse({
@@ -63,8 +89,8 @@ export class AuthController {
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -74,11 +100,20 @@ export class AuthController {
 
 
   @Post('logout')
-  async logout(@Res({ passthrough: true }) res) {
-    res.setHeader(
-      'Set-Cookie',
-      'access_token=; HttpOnly; Path=/; Max-Age=0',
-    )
+  async logout(@Req() req, @Res({ passthrough: true }) res) {
+    const encryptedToken = req.cookies?.access_token;
+    if (encryptedToken) {
+      await this.authService.logout(encryptedToken);
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie('access_token', '', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
+      maxAge: 0,
+    });
 
     return { message: 'Successfully logged out', isLoggedIn: false }
   }
@@ -98,8 +133,8 @@ export class AuthController {
 
     res.cookie('access_token', encryptedToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -123,15 +158,12 @@ export class AuthController {
   }
 
   @Post('forgot-password')
-  forgot(@Body('email') email: string) {
-    return this.authService.requestResetPassword(email)
+  forgot(@Body() dto: ForgotPasswordDto) {
+    return this.authService.requestResetPassword(dto.email)
   }
 
   @Post('reset-password')
-  reset(
-    @Body('token') token: string,
-    @Body('password') password: string
-  ) {
-    return this.authService.resetPassword(token, password)
+  reset(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password)
   }
 }
